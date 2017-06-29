@@ -396,14 +396,14 @@ module ShellUtils
     mx_sulong 'su-link', *args
   end
 
-  def mspec(command, *args)
-    env_vars = {}
-    if command.is_a?(Hash)
-      env_vars = command
-      command, *args = args
+  def run_mspec(command, flags, *args)
+    if args.include?('-t')
+      interpreter = args[args.index('-t')+1]
+      raw_sh interpreter, *flags, "spec/mspec/bin/mspec", command, '--config', 'spec/truffle.mspec', *args
+    else
+      raise "-T is unsupported by jt specs: #{args}" if args.include? { |arg| arg.start_with?('-T') }
+      ruby *flags, "spec/mspec/bin/mspec-#{command}", '--config', 'spec/truffle.mspec', *args
     end
-
-    sh env_vars, Utilities.find_ruby, 'spec/mspec/bin/mspec', command, '--config', 'spec/truffle.mspec', *args
   end
 
   def newer?(input, output)
@@ -892,7 +892,7 @@ module Commands
     sh RbConfig.ruby, 'test/truffle/cexts/test-preprocess.rb'
 
     # Test that we can compile and run some basic C code that uses libxml and openssl
-    
+
     if ENV['OPENSSL_PREFIX']
       openssl_cflags = ['-I', "#{ENV['OPENSSL_PREFIX']}/include"]
       openssl_lib = "#{ENV['OPENSSL_PREFIX']}/lib/libssl.#{SO}"
@@ -1102,23 +1102,24 @@ module Commands
   end
 
   def mspec(*args)
-    super(*args)
+    command, *args = args
+    run_mspec(command, [], *args)
   end
 
   def test_specs(command, *args)
-    env_vars = {}
-    options = []
+    mspec_options = []
+    ruby_flags = []
 
     case command
     when 'run'
-      options += %w[--excl-tag fails]
+      mspec_options += %w[--excl-tag fails]
     when 'tag'
-      options += %w[--add fails --fail --excl-tag fails]
+      mspec_options += %w[--add fails --fail --excl-tag fails]
     when 'untag'
-      options += %w[--del fails --pass]
+      mspec_options += %w[--del fails --pass]
       command = 'tag'
     when 'tag_all'
-      options += %w[--unguarded --all --dry-run --add fails]
+      mspec_options += %w[--unguarded --all --dry-run --add fails]
       command = 'tag'
     else
       raise command
@@ -1126,46 +1127,61 @@ module Commands
 
     if args.first == 'fast'
       args.shift
-      options += %w[--excl-tag slow]
+      mspec_options += %w[--excl-tag slow]
+    end
+
+    if args.include?('-t')
+      return run_mspec(command, ruby_flags, *mspec_options, *args)
     end
 
     if args.delete('--aot')
-      verify_aot_bin!
+      ENV['RUBY_EXE'] = verify_aot_bin!
+      mspec_options << '--aot' # For ruby()
+      mspec_options += %w[--excl-tag graalvm]
 
-      options += %w[--excl-tag graalvm]
-      options << '-t' << ENV['AOT_BIN']
-      options << '-T-XX:OldGenerationSize=2G'
-      options << "-T-Xhome=#{TRUFFLERUBY_DIR}"
+      ruby_flags << "-Xhome=#{TRUFFLERUBY_DIR}"
+      ruby_flags << '-XX:OldGenerationSize=2G'
+    else
+      ENV['RUBY_EXE'] = Utilities.find_launcher
+      ruby_flags << '-J-ea' << '-J-esa'
+      ruby_flags << '-J-da:com.oracle.truffle.api.interop.ForeignAccess'
+      ruby_flags << '-J-Xmx2G'
+      ruby_flags << '--disable-gems'
+      ruby_flags << '-Xgraal.warn_unless=false'
+      ruby_flags << '-Xbacktraces.hide_core_files=false'
     end
 
     if args.delete('--graal')
       javacmd, javacmd_options = Utilities.find_graal_javacmd_and_options
-      env_vars["JAVACMD"] = javacmd
-      options.concat javacmd_options.map { |o| "-T#{o}" }
+      ENV["JAVACMD"] = javacmd
+      ruby_flags.concat javacmd_options
     end
 
     if args.delete('--sulong')
-      options.push *Utilities.find_sulong_options.map { |o| "-T#{o}" }
+      ruby_flags.concat Utilities.find_sulong_options
     end
 
     if args.delete('--jdebug')
-      options << "-T#{JDEBUG}"
+      ruby_flags << JDEBUG
     end
 
     if args.delete('--jexception') || args.delete('--jexceptions')
-      options << "-T#{JEXCEPTION}"
+      ruby_flags << JEXCEPTION
     end
 
     if args.delete('--truffle-formatter')
-      options += %w[--format spec/truffle_formatter.rb]
+      mspec_options += %w[--format spec/truffle_formatter.rb]
     end
 
     if ENV['CI']
       # Need lots of output to keep Travis happy
-      options += %w[--format specdoc]
+      mspec_options += %w[--format specdoc]
     end
 
-    mspec env_vars, command, *options, *args
+    # Pass ruby_flags to both ruby() and to subprocesses so they have the same flags
+    ENV['RUBY_FLAGS'] = ruby_flags.join(' ')
+    ENV['MSPEC_RUNNER'] = '1'
+    run_mspec(command, ruby_flags, *mspec_options, *args)
   end
   private :test_specs
 
@@ -1661,6 +1677,7 @@ module Commands
     unless File.exist?(ENV['AOT_BIN'].to_s)
       raise "AOT_BIN must point at an AOT build of TruffleRuby"
     end
+    ENV['AOT_BIN']
   end
 
 end
