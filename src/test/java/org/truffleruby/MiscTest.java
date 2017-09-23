@@ -13,9 +13,11 @@ import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -85,6 +87,7 @@ public class MiscTest {
         }
     }
 
+    @Ignore("Truffle considers Fibers threads as multithreading currently")
     @Test
     public void testFiberFromIntegratorThread() throws InterruptedException {
         try (Context context = Context.newBuilder().allowCreateThread(true).build()) {
@@ -96,6 +99,73 @@ public class MiscTest {
             });
             thread.start();
             thread.join();
+        }
+    }
+
+    @Test
+    public void testSharingSingleThreaded() throws InterruptedException {
+        try (Context context = Context.create()) {
+            boolean shared1 = context.eval("ruby", "BAR=Object.new; Truffle::Debug.shared?(BAR)").asBoolean();
+            assertFalse(shared1);
+
+            Thread thread = new Thread(() -> {
+                boolean shared2 = context.eval("ruby", "FOO = Object.new; Truffle::Debug.shared?(FOO)").asBoolean();
+                assertFalse(shared2);
+            });
+            thread.start();
+            thread.join();
+        }
+    }
+
+    @Test
+    public void testSharingGuestMultiThreaded() {
+        try (Context context = Context.newBuilder().allowCreateThread(true).build()) {
+            context.eval("ruby", "$done = false");
+
+            context.eval("ruby", "Thread.new { FOO = Object.new }.join");
+            boolean shared = context.eval("ruby", "Truffle::Debug.shared?(FOO)").asBoolean();
+            assertTrue(shared);
+        }
+    }
+
+    @Test
+    public void testSharingHostMultiThreaded() {
+        try (Context context = Context.create()) {
+            context.eval("ruby", "$done = false");
+
+            Thread thread1 = new Thread(() -> {
+                context.eval("ruby", "$other_thread = Thread.current; Thread.pass until $done");
+            });
+
+            Thread thread2 = new Thread(() -> {
+                boolean shared = context.eval("ruby",
+                        "Thread.pass until $other_thread\n" +
+                                "FOO = Object.new\n" +
+                                "$done = true\n" +
+                                "Truffle::Debug.shared?(FOO)").asBoolean();
+                assertTrue(shared);
+            });
+
+            thread1.start();
+            thread2.start();
+
+            pollWhileInterrupted(context, thread1::join);
+            pollWhileInterrupted(context, thread2::join);
+        }
+    }
+
+    private interface BlockingAction {
+        void block() throws InterruptedException;
+    }
+
+    private void pollWhileInterrupted(Context context, BlockingAction action) {
+        while (true) {
+            try {
+                action.block();
+                break;
+            } catch (InterruptedException e) {
+                context.eval("ruby", ":poll_for_safepoint");
+            }
         }
     }
 

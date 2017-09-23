@@ -219,6 +219,23 @@ public class RubyLanguage extends TruffleLanguage<RubyContext> {
     }
 
     @Override
+    protected void initializeMultiThreading(RubyContext context) {
+        // It's bad in initializeMultiThreading() as it would trigger for Fibers
+        // But initializeThread() is also bad because it's under the lock and so other threads
+        // cannot enter the PolyglotContext either so join the safepoint.
+        if (context.getOptions().SHARED_OBJECTS_ENABLED) {
+            if (!context.getSharedObjects().isSharing()) {
+                System.err.println("start sharing");
+                // We need to start sharing on the currently running Thread, otherwise
+                // that thread would see a stale state and try sharing already shared objects.
+                context.getSafepointManager().pauseAllThreadsAndExecuteFromNonRubyThread(false, (rubyThread, node) -> {
+                    context.getSharedObjects().startSharing();
+                });
+            }
+        }
+    }
+
+    @Override
     protected void initializeThread(RubyContext context, Thread thread) {
         if (thread == context.getThreadManager().getRootJavaThread()) {
             // Already initialized when creating the context
@@ -231,6 +248,7 @@ public class RubyLanguage extends TruffleLanguage<RubyContext> {
         }
 
         final DynamicObject foreignThread = context.getThreadManager().createForeignThread();
+
         context.getThreadManager().start(foreignThread, thread);
     }
 

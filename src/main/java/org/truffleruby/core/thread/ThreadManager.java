@@ -18,6 +18,7 @@ import com.oracle.truffle.api.object.DynamicObject;
 import jnr.constants.platform.Errno;
 import jnr.constants.platform.Signal;
 import jnr.posix.Timeval;
+
 import org.truffleruby.Layouts;
 import org.truffleruby.Log;
 import org.truffleruby.RubyContext;
@@ -100,6 +101,7 @@ public class ThreadManager {
     public DynamicObject createBootThread(String info) {
         final DynamicObject thread = context.getCoreLibrary().getThreadFactory().newInstance(packThreadFields(nil(), info));
         setFiberManager(thread);
+        shareThread(thread);
         return thread;
     }
 
@@ -108,6 +110,7 @@ public class ThreadManager {
         final DynamicObject thread = allocateObjectNode.allocate(rubyClass,
                 packThreadFields(currentGroup, "<uninitialized>"));
         setFiberManager(thread);
+        shareThread(thread);
         return thread;
     }
 
@@ -116,12 +119,19 @@ public class ThreadManager {
         final DynamicObject thread = context.getCoreLibrary().getThreadFactory().newInstance(
                 packThreadFields(currentGroup, "<foreign thread>"));
         setFiberManager(thread);
+        shareThread(thread);
         return thread;
     }
 
     private void setFiberManager(DynamicObject thread) {
         // Because it is cyclic
         Layouts.THREAD.setFiberManagerUnsafe(thread, new FiberManager(context, thread));
+    }
+
+    private void shareThread(DynamicObject thread) {
+        if (context.getSharedObjects().isSharing()) {
+            SharedObjects.writeBarrier(context, thread);
+        }
     }
 
     private Object[] packThreadFields(DynamicObject currentGroup, String info) {
@@ -457,12 +467,6 @@ public class ThreadManager {
     public void registerThread(DynamicObject thread) {
         assert RubyGuards.isRubyThread(thread);
         runningRubyThreads.add(thread);
-
-        if (context.getOptions().SHARED_OBJECTS_ENABLED && runningRubyThreads.size() > 1) {
-            // TODO (eregon, 22 Sept 2017): no need if singleThreaded in isThreadAccessAllowed()
-            context.getSharedObjects().startSharing();
-            SharedObjects.writeBarrier(context, thread);
-        }
     }
 
     public void unregisterThread(DynamicObject thread) {
