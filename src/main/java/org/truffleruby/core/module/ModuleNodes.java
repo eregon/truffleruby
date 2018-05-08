@@ -19,6 +19,7 @@ import com.oracle.truffle.api.dsl.CreateCast;
 import com.oracle.truffle.api.dsl.ImportStatic;
 import com.oracle.truffle.api.dsl.NodeChild;
 import com.oracle.truffle.api.dsl.NodeChildren;
+import com.oracle.truffle.api.dsl.ReportPolymorphism;
 import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.frame.Frame;
 import com.oracle.truffle.api.frame.FrameInstance;
@@ -294,7 +295,8 @@ public abstract class ModuleNodes {
 
     }
 
-    @CoreMethod(names = "alias_method", required = 2, raiseIfFrozenSelf = true, visibility = Visibility.PRIVATE)
+    @ReportPolymorphism.Exclude
+    @CoreMethod(names = "alias_method", required = 2, raiseIfFrozenSelf = true, visibility = Visibility.PRIVATE, neverSplit = true)
     @NodeChildren({
             @NodeChild(type = RubyNode.class, value = "module"),
             @NodeChild(type = RubyNode.class, value = "newName"),
@@ -405,7 +407,7 @@ public abstract class ModuleNodes {
                 accessInstanceVariable = new WriteInstanceVariableNode(ivar, self, readArgument);
             }
             final RubyNode sequence = Translator.sequence(sourceIndexLength, Arrays.asList(checkArity, accessInstanceVariable));
-            final RubyRootNode rootNode = new RubyRootNode(getContext(), sourceSection, null, sharedMethodInfo, sequence);
+            final RubyRootNode rootNode = new RubyRootNode(getContext(), sourceSection, null, sharedMethodInfo, sequence, true);
             final CallTarget callTarget = Truffle.getRuntime().createCallTarget(rootNode);
             final InternalMethod method = new InternalMethod(getContext(), sharedMethodInfo, lexicalScope, DeclarationContext.NONE, accessorName, module, visibility, callTarget);
 
@@ -1087,7 +1089,7 @@ public abstract class ModuleNodes {
 
             final RubyNode body = NodeUtil.cloneNode(rootNode.getBody());
             final RubyNode newBody = new CallMethodWithProcBody(declarationFrame, body);
-            final RubyRootNode newRootNode = new RubyRootNode(getContext(), info.getSourceSection(), rootNode.getFrameDescriptor(), info, newBody);
+            final RubyRootNode newRootNode = new RubyRootNode(getContext(), info.getSourceSection(), rootNode.getFrameDescriptor(), info, newBody, true);
             final CallTarget newCallTarget = Truffle.getRuntime().createCallTarget(newRootNode);
 
             final DeclarationContext declarationContext = Layouts.PROC.getDeclarationContext(proc);

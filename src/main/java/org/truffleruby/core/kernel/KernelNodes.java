@@ -1129,7 +1129,7 @@ public abstract class KernelNodes {
             final SharedMethodInfo info = methodMissing.getSharedMethodInfo().withName(normalizedName);
 
             final RubyNode newBody = new CallMethodMissingWithStaticName(name);
-            final RubyRootNode newRootNode = new RubyRootNode(getContext(), info.getSourceSection(), new FrameDescriptor(nil()), info, newBody);
+            final RubyRootNode newRootNode = new RubyRootNode(getContext(), info.getSourceSection(), new FrameDescriptor(nil()), info, newBody, true);
             final CallTarget newCallTarget = Truffle.getRuntime().createCallTarget(newRootNode);
 
             final DynamicObject module = coreLibrary().getMetaClass(self);

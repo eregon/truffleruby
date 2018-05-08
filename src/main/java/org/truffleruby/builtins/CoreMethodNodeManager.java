@@ -157,7 +157,7 @@ public class CoreMethodNodeManager {
             return createCoreMethodNode(context, nodeFactory, methodAnnotation, sharedMethodInfo);
         });
 
-        final CallTarget callTarget = createCallTarget(context, sharedMethodInfo, methodNode);
+        final CallTarget callTarget = createCallTarget(context, sharedMethodInfo, methodNode, false);
 
         addMethods(module, isModuleFunction, onSingleton, names, visibility, sharedMethodInfo, callTarget);
     }
@@ -174,7 +174,7 @@ public class CoreMethodNodeManager {
         }
     }
 
-    private void verifyUsage(DynamicObject module, MethodDetails methodDetails, final CoreMethod method, final Visibility visibility) {
+    private void verifyUsage(DynamicObject module, MethodDetails methodDetails, CoreMethod method, Visibility visibility) {
         if (method.isModuleFunction()) {
             if (visibility != Visibility.PUBLIC) {
                 Log.LOGGER.warning("visibility ignored when isModuleFunction in " + methodDetails.getIndicativeName());
@@ -238,11 +238,11 @@ public class CoreMethodNodeManager {
             methodNode = createCoreMethodNode(context, nodeFactory, method, sharedMethodInfo);
         }
 
-        return createCallTarget(context, sharedMethodInfo, methodNode);
+        return createCallTarget(context, sharedMethodInfo, methodNode, method.neverSplit());
     }
 
-    private static CallTarget createCallTarget(RubyContext context, SharedMethodInfo sharedMethodInfo, RubyNode methodNode) {
-        final RubyRootNode rootNode = new RubyRootNode(context, sharedMethodInfo.getSourceSection(), null, sharedMethodInfo, methodNode);
+    private static CallTarget createCallTarget(RubyContext context, SharedMethodInfo sharedMethodInfo, RubyNode methodNode, boolean neverSplit) {
+        final RubyRootNode rootNode = new RubyRootNode(context, sharedMethodInfo.getSourceSection(), null, sharedMethodInfo, methodNode, !neverSplit);
         return Truffle.getRuntime().createCallTarget(rootNode);
     }
 

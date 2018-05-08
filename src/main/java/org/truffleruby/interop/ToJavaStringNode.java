@@ -12,6 +12,7 @@ package org.truffleruby.interop;
 import com.oracle.truffle.api.dsl.Cached;
 import com.oracle.truffle.api.dsl.ImportStatic;
 import com.oracle.truffle.api.dsl.NodeChild;
+import com.oracle.truffle.api.dsl.ReportPolymorphism;
 import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.object.DynamicObject;
 import com.oracle.truffle.api.profiles.ConditionProfile;
@@ -23,6 +24,7 @@ import org.truffleruby.core.string.StringCachingGuards;
 import org.truffleruby.core.string.StringOperations;
 import org.truffleruby.language.RubyNode;
 
+@ReportPolymorphism.Exclude
 @ImportStatic({ StringCachingGuards.class, StringOperations.class })
 @NodeChild(value = "value", type = RubyNode.class)
 public abstract class ToJavaStringNode extends RubyNode {

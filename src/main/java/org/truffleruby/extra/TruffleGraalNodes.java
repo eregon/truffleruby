@@ -54,7 +54,7 @@ public abstract class TruffleGraalNodes {
 
     }
 
-    @CoreMethod(names = "always_split", onSingleton = true, required = 1)
+    @CoreMethod(names = "always_split", onSingleton = true, required = 1, neverSplit = true)
     public abstract static class AlwaysSplitNode extends CoreMethodArrayArgumentsNode {
 
         @Specialization(guards = "isRubyMethod(rubyMethod)")
@@ -99,7 +99,7 @@ public abstract class TruffleGraalNodes {
                 Object value = frame.getValue(readNode.getFrameSlot());
                 readNode.replace(new ObjectLiteralNode(value));
             }
-            final RubyRootNode newRootNode = new RubyRootNode(getContext(), rootNode.getSourceSection(), rootNode.getFrameDescriptor(), rootNode.getSharedMethodInfo(), newBody);
+            final RubyRootNode newRootNode = new RubyRootNode(getContext(), rootNode.getSourceSection(), rootNode.getFrameDescriptor(), rootNode.getSharedMethodInfo(), newBody, true);
             final CallTarget newCallTarget = Truffle.getRuntime().createCallTarget(newRootNode);
 
             final CallTarget callTargetForLambdas;

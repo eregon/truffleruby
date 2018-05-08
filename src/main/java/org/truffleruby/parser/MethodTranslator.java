@@ -156,7 +156,7 @@ public class MethodTranslator extends BodyTranslator {
         bodyProc.unsafeSetSourceSection(enclosing(sourceSection, body));
 
         final RubyRootNode newRootNodeForProcs = new RubyRootNode(context, translateSourceSection(source, sourceSection), environment.getFrameDescriptor(), environment.getSharedMethodInfo(),
-                bodyProc);
+                bodyProc, true);
 
         // Lambdas
         RubyNode composed = composeBody(sourceSection, preludeLambda, body /* no copy, last usage */);
@@ -166,7 +166,7 @@ public class MethodTranslator extends BodyTranslator {
         final RubyRootNode newRootNodeForLambdas = new RubyRootNode(
                 context, translateSourceSection(source, sourceSection),
                 environment.getFrameDescriptor(), environment.getSharedMethodInfo(),
-                composed);
+                composed, true);
 
         // TODO CS 23-Nov-15 only the second one will get instrumented properly!
         final CallTarget callTargetAsLambda = Truffle.getRuntime().createCallTarget(newRootNodeForLambdas);
@@ -305,7 +305,7 @@ public class MethodTranslator extends BodyTranslator {
                 fullMethodSourceSection,
                 environment.getFrameDescriptor(),
                 environment.getSharedMethodInfo(),
-                body);
+                body, true);
 
         return Truffle.getRuntime().createCallTarget(rootNode);
     }
