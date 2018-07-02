@@ -930,7 +930,7 @@ module Commands
     }
 
     truffle_args =  if extra_args.include?('--native')
-                      %W[-Xhome=#{TRUFFLERUBY_DIR}]
+                      []
                     else
                       %w[-J-Xmx2G -J-ea -J-esa --jexceptions]
                     end
