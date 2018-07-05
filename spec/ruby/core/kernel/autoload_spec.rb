@@ -8,6 +8,7 @@ require_relative 'fixtures/classes'
 autoload :KSAutoloadA, "autoload_a.rb"
 autoload :KSAutoloadB, fixture(__FILE__, "autoload_b.rb")
 autoload :KSAutoloadC, fixture(__FILE__, "autoload_c.rb")
+autoload :KSAutoloadCallsRequire, "main_autoload_not_exist.rb"
 
 def check_autoload(const)
   autoload? const
@@ -40,6 +41,13 @@ describe "Kernel#autoload" do
 
   it "loads the file when the constant is accessed" do
     KSAutoloadB.loaded.should == :ksautoload_b
+  end
+
+  it "calls main.require(path) to load the file" do
+    main = TOPLEVEL_BINDING.eval("self")
+    main.should_receive(:require).with("main_autoload_not_exist.rb")
+    # The constant won't be defined since require is changed to do nothing
+    -> { KSAutoloadCallsRequire }.should raise_error(NameError)
   end
 
   it "does not call Kernel.require or Kernel.load to load the file" do
