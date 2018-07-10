@@ -324,6 +324,8 @@ module Truffle::FFI
       case type
       when FFI::TYPE_CHARARR
         (@pointer + offset).read_string
+      when FFI::TYPE_STRING
+        @pointer.get_pointer(offset).read_string
       when Integer
         @pointer.get_at_offset(offset, type)
       when FFI::Type::Array
