@@ -717,6 +717,11 @@ module Commands
     e 'p begin', *args, 'end'
   end
 
+  # Just convenience
+  def gem(*args)
+    ruby '-S', 'gem', *args
+  end
+
   def cextc(cext_dir, *clang_opts)
     cext_dir = File.expand_path(cext_dir)
     name = File.basename(cext_dir)
