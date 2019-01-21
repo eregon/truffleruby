@@ -26,6 +26,7 @@ import com.oracle.truffle.api.dsl.Cached;
 import com.oracle.truffle.api.dsl.NodeChild;
 import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.frame.VirtualFrame;
+import org.truffleruby.language.dispatch.DispatchNode;
 
 @NodeChild("width")
 @NodeChild("value")
@@ -35,6 +36,7 @@ public abstract class FormatCharacterNode extends FormatNode {
 
     @Child private ToIntegerNode toIntegerNode;
     @Child private ToStringNode toStringNode;
+    @Child private DispatchNode chrNode = DispatchNode.create();
 
     public FormatCharacterNode(boolean hasMinusFlag) {
         this.hasMinusFlag = hasMinusFlag;
@@ -54,7 +56,7 @@ public abstract class FormatCharacterNode extends FormatNode {
         return StringUtils.formatASCIIBytes(makeFormatString(width), charString);
     }
 
-    protected String getCharString(VirtualFrame frame, Object value) {
+    protected String getCharString(VirtualFrame frame, Object value) { // should return byte[]
         if (toStringNode == null) {
             CompilerDirectives.transferToInterpreterAndInvalidate();
             toStringNode = insert(ToStringNodeGen.create(false, "to_str", false, null, null));
@@ -72,7 +74,12 @@ public abstract class FormatCharacterNode extends FormatNode {
                 CompilerDirectives.transferToInterpreterAndInvalidate();
                 toIntegerNode = insert(ToIntegerNodeGen.create(null));
             }
-            final int charValue = (int) toIntegerNode.executeToInteger(frame, value);
+
+            final int codepoint = (int) toIntegerNode.executeToInteger(frame, value);
+
+            final int charValue = codepoint; // Incorrect, should be:
+            // chrNode.call(codepoint, "chr", formatStringEncoding);
+
             // TODO BJF check char length is > 0
             charString = Character.toString((char) charValue);
         } else {
