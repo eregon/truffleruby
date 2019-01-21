@@ -25,7 +25,14 @@ describe :kernel_sprintf_encoding, shared: true do
     result.encoding.should equal(Encoding::UTF_8)
   end
 
-  it "raises Encoding::CompatibilityError if both encodings are ASCII compatible and there ano not ASCII characters" do
+  it "uses the encoding of the format string to interpret codepoints" do
+    result = format("%c".force_encoding("euc-jp"), 9415601)
+    result.encoding.should == Encoding::EUC_JP
+    result.bytes.should == [143, 171, 177]
+    result.should == "é".encode(Encoding::EUC_JP)
+  end
+
+  it "raises Encoding::CompatibilityError if both encodings are ASCII compatible and there are not ASCII characters" do
     string = "Ä %s".encode('windows-1252')
     argument = "Ђ".encode('windows-1251')
 

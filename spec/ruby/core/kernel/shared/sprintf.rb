@@ -302,7 +302,10 @@ describe :kernel_sprintf, shared: true do
       end
 
       it "supports Unicode characters" do
-        @method.call("%c", 1286).should == "Ԇ"
+        result = @method.call("%c", 1286)
+        result.bytes.should == [212, 134]
+        result.should == "Ԇ"
+
         @method.call("%c", "ش").should == "ش"
       end
     end
