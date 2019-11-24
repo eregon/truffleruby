@@ -105,6 +105,7 @@ public abstract class Layouts {
     public static final HiddenKey FINALIZER_REF_IDENTIFIER = new HiddenKey("finalizerRef"); // FinalizerReference
     public static final HiddenKey MARKED_OBJECTS_IDENTIFIER = new HiddenKey("marked_objects"); // Object[]
     public static final HiddenKey VALUE_WRAPPER_IDENTIFIER = new HiddenKey("value_wrapper"); // ValueWrapper
+    public static final HiddenKey RUBY2_KEYWORDS_IDENTIFIER = new HiddenKey("ruby2_keywords");
 
     // Generated layouts
 

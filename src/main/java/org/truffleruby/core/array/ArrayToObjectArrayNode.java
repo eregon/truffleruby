@@ -9,6 +9,7 @@
  */
 package org.truffleruby.core.array;
 
+import com.oracle.truffle.api.profiles.ConditionProfile;
 import org.truffleruby.Layouts;
 import org.truffleruby.language.RubyBaseNode;
 import org.truffleruby.language.RubyGuards;
@@ -17,6 +18,7 @@ import com.oracle.truffle.api.dsl.Cached;
 import com.oracle.truffle.api.dsl.ImportStatic;
 import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.object.DynamicObject;
+import org.truffleruby.language.objects.ReadObjectFieldNode;
 
 @ImportStatic(ArrayGuards.class)
 public abstract class ArrayToObjectArrayNode extends RubyBaseNode {
@@ -25,10 +27,25 @@ public abstract class ArrayToObjectArrayNode extends RubyBaseNode {
         return ArrayToObjectArrayNodeGen.create();
     }
 
+    private final ConditionProfile nonEmptyProfile = ConditionProfile.createBinaryProfile();
+    private final ConditionProfile isHashProfile = ConditionProfile.createBinaryProfile();
+    private final ConditionProfile hasFlagProfile = ConditionProfile.createBinaryProfile();
+    @Child ReadObjectFieldNode readObjectFieldNode = ReadObjectFieldNode.create();
+
     public Object[] unsplat(Object[] arguments) {
         assert arguments.length == 1;
         assert RubyGuards.isRubyArray(arguments[0]);
-        return executeToObjectArray((DynamicObject) arguments[0]);
+        final Object[] array = executeToObjectArray((DynamicObject) arguments[0]);
+
+        if (nonEmptyProfile.profile(array.length > 0)) {
+            final Object last = array[array.length - 1];
+            if (isHashProfile.profile(RubyGuards.isRubyHash(last)) &&
+                    hasFlagProfile.profile((boolean) readObjectFieldNode.execute((DynamicObject) last, Layouts.RUBY2_KEYWORDS_IDENTIFIER, false))) {
+                throw new Error("ruby2_keywords");
+            }
+        }
+
+        return array;
     }
 
     public abstract Object[] executeToObjectArray(DynamicObject array);
