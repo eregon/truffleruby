@@ -2,6 +2,7 @@ language: ruby
 rvm: 2.6.2
 install:
   - tool/jt.rb install jvmci
+  - tool/jt.rb mx version
   - tool/jt.rb mx sforceimports
   - tool/jt.rb build
   - gem install rubocop:0.66.0
