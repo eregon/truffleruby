@@ -3,6 +3,8 @@ rvm: 2.6.2
 install:
   - tool/jt.rb install jvmci
   - tool/jt.rb mx version
+  - git clone --depth 1 https://github.com/oracle/graal.git ../graal
+  - git -C ../graal fetch --shallow-since=05/11/2019
   - tool/jt.rb mx sforceimports
 script:
   - true
