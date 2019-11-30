@@ -4,10 +4,8 @@ install:
   - tool/jt.rb install jvmci
   - tool/jt.rb mx version
   - tool/jt.rb mx sforceimports
-  - tool/jt.rb build
-  - gem install rubocop:0.66.0
 script:
-  - tool/jt.rb lint
+  - true
 cache:
   directories:
     - $HOME/.mx/cache
