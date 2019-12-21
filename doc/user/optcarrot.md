@@ -14,7 +14,7 @@ following command.
 $ path/to/graalvm/bin/ruby --jvm bin/optcarrot --sdl2 --audio=none examples/Lan_Master.nes
 ```
 
-On macOS, you might need an extra flag for the GUI to appear:
+On macOS, you need an extra `--vm.XstartOnFirstThread` flag for the GUI to work:
 
 ```bash
 $ path/to/graalvm/bin/ruby --jvm --vm.XstartOnFirstThread bin/optcarrot --sdl2 --audio=none examples/Lan_Master.nes
