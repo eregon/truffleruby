@@ -39,12 +39,15 @@ public abstract class Rope {
     }
 
     /**
-     * Fast-path encoding change when there is little to do.
-     *
-     * @param newEncoding the new Encoding
-     * @param newCodeRange always CR-7BIT, except when newEncoding is BINARY can also be CR-VALID
+     * Returns a Rope with the given Encoding.
+     * The newEncoding must be ASCII-compatible and the rope must be {@link #isAsciiOnly()}.
      */
-    public abstract Rope withEncoding(Encoding newEncoding, CodeRange newCodeRange);
+    abstract Rope withEncoding7bit(Encoding newEncoding);
+
+    /**
+     * {@link #getCodeRange()} must be {@link CodeRange#CR_VALID} to call this.
+     */
+    abstract Rope withBinaryEncoding();
 
     public abstract int characterLength();
 
