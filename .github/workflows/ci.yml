@@ -37,8 +37,8 @@ jobs:
     - name: jt lint
       run: tool/jt.rb lint
 
-    - name: jt test fast
-      run: tool/jt.rb test fast
+    - name: jt test specs
+      run: tool/jt.rb test specs
 
   mri_specs:
     name: Run ruby/spec on CRuby ${{ matrix.ruby }}
