@@ -4,7 +4,7 @@ name: CI
 on: [push, pull_request]
 jobs:
   lint:
-    name: Lint + test fast
+    name: Lint + test specs
     runs-on: ubuntu-20.04
     steps:
     - name: Clone TruffleRuby
@@ -37,8 +37,8 @@ jobs:
     - name: jt lint
       run: tool/jt.rb lint
 
-    - name: jt test fast
-      run: tool/jt.rb test fast
+    - name: jt test specs
+      run: tool/jt.rb test specs
 
   mri_specs:
     name: Run ruby/spec on CRuby ${{ matrix.ruby }}
