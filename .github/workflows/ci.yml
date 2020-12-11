@@ -7,6 +7,10 @@ jobs:
     name: jt lint + jt test fast
     runs-on: ubuntu-20.04
     steps:
+
+    - run: ls -l /bin/sh
+    - run: realpath /bin/sh
+
     - name: Clone TruffleRuby
       uses: actions/checkout@v2
     - name: Setup system Ruby
@@ -32,15 +36,16 @@ jobs:
     - name: Build TruffleRuby
       run: tool/jt.rb build
 
-    - name: Install RuboCop
-      run: gem install --no-document rubocop:0.66.0
-    - name: jt lint
-      run: tool/jt.rb lint
+#    - name: Install RuboCop
+#      run: gem install --no-document rubocop:0.66.0
+#    - name: jt lint
+#      run: tool/jt.rb lint
 
     - name: jt test specs
-      run: tool/jt.rb test specs
+      run: tool/jt.rb test spec/ruby/core/exception/signal_exception_spec.rb -- --no-core-load-path
 
   mri_specs:
+    if: false
     name: Run ruby/spec on CRuby ${{ matrix.ruby }}
     strategy:
       fail-fast: false
