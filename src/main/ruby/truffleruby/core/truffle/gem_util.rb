@@ -122,12 +122,17 @@ module Truffle::GemUtil
       if gem_path = ENV['GEM_PATH']
         paths.concat gem_path.split(File::PATH_SEPARATOR)
       else
-        user_dir = "#{Dir.home}/.gem/truffleruby/#{RUBY_ENGINE_VERSION}"
+        user_dir = "#{Dir.home}/.gem/truffleruby/#{abi_version}"
         paths << user_dir
       end
 
       paths.map { |path| expand(path) }.uniq
     end
+  end
+
+  def self.abi_version
+    abi_version = File.read("#{Truffle::Boot.ruby_home}/lib/cext/ABI_version.txt").strip
+    "#{RUBY_VERSION}.#{abi_version}"
   end
 
   def self.expand(path)
