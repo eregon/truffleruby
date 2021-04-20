@@ -131,8 +131,10 @@ module Truffle::GemUtil
   end
 
   def self.abi_version
-    abi_version = File.read("#{Truffle::Boot.ruby_home}/lib/cext/ABI_version.txt").strip
-    "#{RUBY_VERSION}.#{abi_version}"
+    @abi_version ||= begin
+      version = File.read("#{Truffle::Boot.ruby_home}/lib/cext/ABI_version.txt").strip
+      "#{RUBY_VERSION}.#{version}"
+    end
   end
 
   def self.expand(path)
