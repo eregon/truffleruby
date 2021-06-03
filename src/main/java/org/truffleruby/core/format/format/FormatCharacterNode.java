@@ -10,13 +10,11 @@
 package org.truffleruby.core.format.format;
 
 import org.truffleruby.core.format.FormatNode;
-import org.truffleruby.core.format.LiteralFormatNode;
 import org.truffleruby.core.format.convert.ToIntegerNode;
 import org.truffleruby.core.format.convert.ToIntegerNodeGen;
 import org.truffleruby.core.format.convert.ToStringNode;
 import org.truffleruby.core.format.convert.ToStringNodeGen;
 import org.truffleruby.core.format.exceptions.NoImplicitConversionException;
-import org.truffleruby.core.format.write.bytes.WriteByteNodeGen;
 import org.truffleruby.core.rope.RopeOperations;
 import org.truffleruby.core.string.StringUtils;
 import org.truffleruby.language.RubyGuards;
@@ -59,12 +57,7 @@ public abstract class FormatCharacterNode extends FormatNode {
     protected String getCharString(VirtualFrame frame, Object value) {
         if (toStringNode == null) {
             CompilerDirectives.transferToInterpreterAndInvalidate();
-            toStringNode = insert(ToStringNodeGen.create(
-                    false,
-                    "to_str",
-                    false,
-                    null,
-                    WriteByteNodeGen.create(new LiteralFormatNode(value))));
+            toStringNode = insert(ToStringNodeGen.create(false, "to_str", false, null, null));
         }
         Object toStrResult;
         try {
