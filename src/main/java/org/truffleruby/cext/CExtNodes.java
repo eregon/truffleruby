@@ -15,6 +15,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import com.oracle.truffle.api.TruffleSafepoint;
 import com.oracle.truffle.api.object.DynamicObjectLibrary;
+import com.oracle.truffle.api.strings.TruffleString;
 import org.jcodings.Encoding;
 import org.jcodings.IntHolder;
 import org.jcodings.specific.USASCIIEncoding;
@@ -1357,28 +1358,24 @@ public class CExtNodes {
                 @CachedLibrary(limit = "2") RubyStringLibrary strings,
                 @CachedLibrary("write_p") InteropLibrary receivers,
                 @Cached RopeNodes.BytesNode getBytes,
-                @Cached TranslateInteropExceptionNode translateInteropExceptionNode) {
+                @Cached TranslateInteropExceptionNode translateInteropExceptionNode,
+                @Cached TruffleString.FromByteArrayNode fromByteArrayNode) {
             final byte[] bytes = getBytes.execute(strings.getRope(string));
             final byte[] to = new byte[bytes.length];
             final IntHolder intHolder = new IntHolder();
             intHolder.value = 0;
-            final int resultLength = enc.jcoding
-                    .mbcCaseFold(flags, bytes, intHolder, bytes.length, to);
+            final int resultLength = enc.jcoding.mbcCaseFold(flags, bytes, intHolder, bytes.length, to);
             InteropNodes.execute(write_p, new Object[]{ p, intHolder.value }, receivers, translateInteropExceptionNode);
             final byte[] result = new byte[resultLength];
             if (resultLength > 0) {
                 System.arraycopy(to, 0, result, 0, resultLength);
             }
-            return StringOperations.createString(
-                    this,
-                    RopeOperations.create(result, USASCIIEncoding.INSTANCE, CodeRange.CR_UNKNOWN),
-                    Encodings.US_ASCII);
+            return createString(fromByteArrayNode, result, Encodings.US_ASCII);
         }
 
         protected int getCacheLimit() {
             return getLanguage().options.DISPATCH_CACHE;
         }
-
     }
 
     @CoreMethod(names = "rb_tr_code_to_mbc", onSingleton = true, required = 2, lowerFixnum = 2)

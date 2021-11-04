@@ -14,8 +14,7 @@ import java.io.OutputStream;
 import org.truffleruby.RubyContext;
 import org.truffleruby.RubyLanguage;
 import org.truffleruby.core.encoding.RubyEncoding;
-import org.truffleruby.core.rope.CodeRange;
-import org.truffleruby.core.rope.RopeOperations;
+import org.truffleruby.core.encoding.TStringUtils;
 import org.truffleruby.core.string.StringOperations;
 import org.truffleruby.core.support.RubyIO;
 
@@ -42,7 +41,7 @@ public class OutputStreamAdapter extends OutputStream {
                         .createString(
                                 context,
                                 language,
-                                RopeOperations.create((byte) bite, encoding.jcoding, CodeRange.CR_UNKNOWN),
+                                TStringUtils.fromByteArray(new byte[]{ (byte) bite }, encoding),
                                 encoding));
     }
 

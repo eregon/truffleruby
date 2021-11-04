@@ -14,9 +14,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.oracle.truffle.api.CompilerDirectives.CompilationFinal;
+import com.oracle.truffle.api.strings.TruffleString;
 import org.jcodings.specific.ASCIIEncoding;
 import org.jcodings.specific.USASCIIEncoding;
 import org.jcodings.specific.UTF8Encoding;
+import org.truffleruby.core.encoding.TStringUtils;
 
 public class RopeConstants {
 
@@ -26,10 +28,16 @@ public class RopeConstants {
 
     public static final LeafRope EMPTY_ASCII_8BIT_ROPE = withHashCode(
             new AsciiOnlyLeafRope(EMPTY_BYTES, ASCIIEncoding.INSTANCE));
+    public static final TruffleString EMPTY_BINARY_TSTRING = withHashCode(
+            TStringUtils.fromByteArray(EMPTY_BYTES, TruffleString.Encoding.BYTES)); // Must use TruffleString.Encoding to avoid init cycle
     public static final LeafRope EMPTY_US_ASCII_ROPE = withHashCode(
             new AsciiOnlyLeafRope(EMPTY_BYTES, USASCIIEncoding.INSTANCE));
+    public static final TruffleString EMPTY_US_ASCII_TSTRING = withHashCode(
+            TStringUtils.fromByteArray(EMPTY_BYTES, TruffleString.Encoding.US_ASCII));
     public static final LeafRope EMPTY_UTF8_ROPE = withHashCode(
             new AsciiOnlyLeafRope(EMPTY_BYTES, UTF8Encoding.INSTANCE));
+    public static final TruffleString EMPTY_UTF8_TSTRING = withHashCode(
+            TStringUtils.fromByteArray(EMPTY_BYTES, TruffleString.Encoding.UTF_8));
 
     @CompilationFinal(dimensions = 1) public static final LeafRope[] UTF8_SINGLE_BYTE_ROPES = new LeafRope[256];
     @CompilationFinal(dimensions = 1) public static final LeafRope[] US_ASCII_SINGLE_BYTE_ROPES = new LeafRope[256];

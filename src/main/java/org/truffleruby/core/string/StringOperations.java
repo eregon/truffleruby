@@ -29,6 +29,7 @@ import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 
 import com.oracle.truffle.api.nodes.Node;
+import com.oracle.truffle.api.strings.TruffleString;
 import org.jcodings.Encoding;
 import org.jcodings.specific.ASCIIEncoding;
 import org.truffleruby.RubyContext;
@@ -68,15 +69,14 @@ public abstract class StringOperations {
     }
 
     /** Only use when there is no Node to report the allocation */
-    public static RubyString createString(RubyContext context, RubyLanguage language, Rope rope,
+    public static RubyString createString(RubyContext context, RubyLanguage language, TruffleString rope,
             RubyEncoding encoding) {
-        final RubyString instance = new RubyString(
+        return new RubyString(
                 context.getCoreLibrary().stringClass,
                 language.stringShape,
                 false,
                 rope,
                 encoding);
-        return instance;
     }
 
     public static int clampExclusiveIndex(int length, int index) {

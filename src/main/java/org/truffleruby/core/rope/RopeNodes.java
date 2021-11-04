@@ -1324,6 +1324,7 @@ public abstract class RopeNodes {
 
     }
 
+    @Deprecated // Use TruffleString.GetInternalByteArrayNode instead
     @GenerateUncached
     public abstract static class BytesNode extends RubyBaseNode {
 
@@ -1537,7 +1538,7 @@ public abstract class RopeNodes {
          * algorithm for returning a byte length for invalid byte sequences. This method is to be used when the
          * `codeRange` might be `CodeRange.CR_BROKEN` and the caller must handle the case without raising an error.
          * E.g., if `String#each_char` is called on a String that is `CR_BROKEN`, you wouldn't want negative byte
-         * lengths to be returned because it would break iterating through the bytes. */
+         * lengths to be returned because it would break iterating through the characters. */
         public int characterLengthWithRecovery(Encoding encoding, CodeRange codeRange, Bytes bytes) {
             return executeLength(encoding, codeRange, bytes, true);
         }

@@ -782,23 +782,22 @@ public abstract class EncodingNodes {
             return EncodingNodesFactory.CheckStringEncodingNodeGen.create();
         }
 
-        public abstract RubyEncoding executeCheckEncoding(RopeWithEncoding first, RopeWithEncoding second);
+        public abstract RubyEncoding executeCheckEncoding(Rope first, RubyEncoding firstEncoding, Rope second,
+                RubyEncoding secondEncoding);
 
         @Specialization
-        protected RubyEncoding checkEncoding(RopeWithEncoding first, RopeWithEncoding second,
+        protected RubyEncoding checkEncoding(
+                Rope first, RubyEncoding firstEncoding, Rope second, RubyEncoding secondEncoding,
                 @Cached BranchProfile errorProfile,
                 @Cached NegotiateCompatibleRopeEncodingNode negotiateCompatibleEncodingNode) {
-            final RubyEncoding negotiatedEncoding = negotiateCompatibleEncodingNode.executeNegotiate(
-                    first.getRope(),
-                    first.getEncoding(),
-                    second.getRope(),
-                    second.getEncoding());
+            var negotiatedEncoding = negotiateCompatibleEncodingNode.executeNegotiate(first, firstEncoding, second,
+                    secondEncoding);
 
             if (negotiatedEncoding == null) {
                 errorProfile.enter();
                 throw new RaiseException(getContext(), coreExceptions().encodingCompatibilityErrorIncompatible(
-                        first.getEncoding().jcoding,
-                        second.getEncoding().jcoding,
+                        firstEncoding.jcoding,
+                        secondEncoding.jcoding,
                         this));
             }
 

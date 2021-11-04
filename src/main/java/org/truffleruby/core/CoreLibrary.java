@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import com.oracle.truffle.api.RootCallTarget;
+import com.oracle.truffle.api.strings.TruffleString;
 import org.graalvm.collections.Pair;
 import org.jcodings.specific.USASCIIEncoding;
 import org.jcodings.transcode.EConvFlags;
@@ -822,7 +823,7 @@ public class CoreLibrary {
         RubyString dollarZeroValue = StringOperations.createString(
                 context,
                 language,
-                StringOperations.encodeRope("-", USASCIIEncoding.INSTANCE, CodeRange.CR_7BIT),
+                TruffleString.fromCodePointUncached('-', TruffleString.Encoding.US_ASCII),
                 Encodings.US_ASCII);
         int index = language.getGlobalVariableIndex("$0");
         context.getGlobalVariableStorage(index).setValueInternal(dollarZeroValue);

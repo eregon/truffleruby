@@ -65,14 +65,12 @@ package org.truffleruby.core.string;
 import static org.truffleruby.core.rope.CodeRange.CR_7BIT;
 import static org.truffleruby.core.rope.CodeRange.CR_BROKEN;
 import static org.truffleruby.core.rope.CodeRange.CR_UNKNOWN;
-import static org.truffleruby.core.rope.RopeConstants.EMPTY_ASCII_8BIT_ROPE;
-import static org.truffleruby.core.string.StringOperations.createString;
+import static org.truffleruby.core.rope.RopeConstants.EMPTY_BINARY_TSTRING;
 import static org.truffleruby.core.string.StringSupport.MBCLEN_CHARFOUND_LEN;
 import static org.truffleruby.core.string.StringSupport.MBCLEN_CHARFOUND_P;
 import static org.truffleruby.core.string.StringSupport.MBCLEN_INVALID_P;
 import static org.truffleruby.core.string.StringSupport.MBCLEN_NEEDMORE_P;
 
-import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 
 import com.oracle.truffle.api.TruffleSafepoint;
@@ -81,6 +79,8 @@ import com.oracle.truffle.api.dsl.Cached.Exclusive;
 import com.oracle.truffle.api.dsl.Cached.Shared;
 import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.profiles.LoopConditionProfile;
+import com.oracle.truffle.api.strings.AbstractTruffleString;
+import com.oracle.truffle.api.strings.TruffleString;
 import org.graalvm.collections.Pair;
 import org.jcodings.Config;
 import org.jcodings.Encoding;
@@ -98,6 +98,7 @@ import org.truffleruby.builtins.Primitive;
 import org.truffleruby.builtins.PrimitiveArrayArgumentsNode;
 import org.truffleruby.builtins.PrimitiveNode;
 import org.truffleruby.builtins.YieldingCoreMethodNode;
+import org.truffleruby.collections.ByteArrayBuilder;
 import org.truffleruby.core.CoreLibrary;
 import org.truffleruby.core.array.ArrayUtils;
 import org.truffleruby.core.array.RubyArray;
@@ -114,6 +115,7 @@ import org.truffleruby.core.encoding.EncodingNodes.GetActualEncodingNode;
 import org.truffleruby.core.encoding.EncodingNodes.NegotiateCompatibleEncodingNode;
 import org.truffleruby.core.encoding.Encodings;
 import org.truffleruby.core.encoding.RubyEncoding;
+import org.truffleruby.core.encoding.TStringUtils;
 import org.truffleruby.core.format.FormatExceptionTranslator;
 import org.truffleruby.core.format.exceptions.FormatException;
 import org.truffleruby.core.format.unpack.ArrayResult;
@@ -176,7 +178,6 @@ import org.truffleruby.core.string.StringNodesFactory.StringAppendPrimitiveNodeF
 import org.truffleruby.core.string.StringNodesFactory.StringAreComparableNodeGen;
 import org.truffleruby.core.string.StringNodesFactory.StringByteCharacterIndexNodeFactory;
 import org.truffleruby.core.string.StringNodesFactory.StringByteSubstringPrimitiveNodeFactory;
-import org.truffleruby.core.string.StringNodesFactory.StringDupAsStringInstanceNodeFactory;
 import org.truffleruby.core.string.StringNodesFactory.StringEqualNodeGen;
 import org.truffleruby.core.string.StringNodesFactory.StringSubstringPrimitiveNodeFactory;
 import org.truffleruby.core.string.StringNodesFactory.SumNodeFactory;
@@ -196,7 +197,6 @@ import org.truffleruby.language.control.RaiseException;
 import org.truffleruby.language.dispatch.DispatchNode;
 import org.truffleruby.language.library.RubyStringLibrary;
 import org.truffleruby.language.objects.AllocationTracing;
-import org.truffleruby.language.objects.LogicalClassNode;
 import org.truffleruby.language.objects.WriteObjectFieldNode;
 import org.truffleruby.language.threadlocal.SpecialVariableStorage;
 import org.truffleruby.language.yield.CallBlockNode;
@@ -219,7 +219,6 @@ import com.oracle.truffle.api.nodes.DirectCallNode;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
 import com.oracle.truffle.api.nodes.IndirectCallNode;
 import com.oracle.truffle.api.object.DynamicObjectLibrary;
-import com.oracle.truffle.api.object.Shape;
 import com.oracle.truffle.api.profiles.BranchProfile;
 import com.oracle.truffle.api.profiles.ConditionProfile;
 
@@ -284,17 +283,8 @@ public abstract class StringNodes {
 
         @Specialization
         protected RubyString makeStringFromBytes(byte[] bytes, RubyEncoding encoding, CodeRange codeRange,
-                @Cached MakeLeafRopeNode makeLeafRopeNode) {
-            final LeafRope rope = makeLeafRopeNode
-                    .executeMake(bytes, encoding.jcoding, codeRange, NotProvided.INSTANCE);
-            final RubyString string = new RubyString(
-                    coreLibrary().stringClass,
-                    getLanguage().stringShape,
-                    false,
-                    rope,
-                    encoding);
-            AllocationTracing.trace(string, this);
-            return string;
+                @Cached TruffleString.FromByteArrayNode fromByteArrayNode) {
+            return createString(fromByteArrayNode, bytes, encoding);
         }
 
         @Specialization(guards = "is7Bit(codeRange)")
@@ -317,45 +307,16 @@ public abstract class StringNodes {
 
     }
 
-    public abstract static class StringSubstringNode extends RubyBaseNode {
-
-        @Child private SubstringNode substringNode = SubstringNode.create();
-
-        public static StringSubstringNode create() {
-            return StringNodesFactory.StringSubstringNodeGen.create();
-        }
-
-        public abstract RubyString executeSubstring(Object string, int offset, int byteLength);
-
-        @Specialization
-        protected RubyString substring(Object source, int offset, int byteLength,
-                @CachedLibrary(limit = "2") RubyStringLibrary libSource,
-                @Cached LogicalClassNode logicalClassNode) {
-            final Rope rope = libSource.getRope(source);
-            final RubyClass logicalClass = logicalClassNode.execute(source);
-            final RubyString string = new RubyString(
-                    logicalClass,
-                    getLanguage().stringShape,
-                    false,
-                    substringNode.executeSubstring(rope, offset, byteLength),
-                    libSource.getEncoding(source));
-            AllocationTracing.trace(string, this);
-            return string;
-        }
-
-    }
-
     @CoreMethod(names = { "__allocate__", "__layout_allocate__" }, constructor = true, visibility = Visibility.PRIVATE)
     public abstract static class AllocateNode extends CoreMethodArrayArgumentsNode {
 
         @Specialization
         protected RubyString allocate(RubyClass rubyClass) {
-            final Shape shape = getLanguage().stringShape;
             final RubyString string = new RubyString(
                     rubyClass,
-                    shape,
+                    getLanguage().stringShape,
                     false,
-                    EMPTY_ASCII_8BIT_ROPE,
+                    EMPTY_BINARY_TSTRING,
                     Encodings.BINARY);
             AllocationTracing.trace(string, this);
             return string;
@@ -376,19 +337,8 @@ public abstract class StringNodes {
 
         @Specialization
         protected RubyString add(Object string, Object other,
-                @CachedLibrary(limit = "2") RubyStringLibrary stringLibrary,
                 @Cached StringAppendNode stringAppendNode) {
-            final RopeWithEncoding concatRopeResult = stringAppendNode.executeStringAppend(string, other);
-            final RubyClass rubyClass = coreLibrary().stringClass;
-            final Shape shape = getLanguage().stringShape;
-            final RubyString ret = new RubyString(
-                    rubyClass,
-                    shape,
-                    false,
-                    concatRopeResult.getRope(),
-                    concatRopeResult.getEncoding());
-            AllocationTracing.trace(ret, this);
-            return ret;
+            return stringAppendNode.executeStringAppend(string, other);
         }
     }
 
@@ -408,15 +358,8 @@ public abstract class StringNodes {
         @Specialization(guards = "times == 0")
         protected RubyString multiplyZero(Object string, int times,
                 @CachedLibrary(limit = "2") RubyStringLibrary libString) {
-
-            final RubyString instance = new RubyString(
-                    coreLibrary().stringClass,
-                    getLanguage().stringShape,
-                    false,
-                    RopeOperations.emptyRope(libString.getRope(string).getEncoding()),
-                    libString.getEncoding(string));
-            AllocationTracing.trace(instance, this);
-            return instance;
+            final RubyEncoding encoding = libString.getEncoding(string);
+            return createString(RopeOperations.emptyTString(encoding), encoding);
         }
 
         @Specialization(guards = "times < 0")
@@ -437,14 +380,7 @@ public abstract class StringNodes {
             }
 
             final Rope repeated = repeatNode.executeRepeat(stringRope, times);
-            final RubyString instance = new RubyString(
-                    coreLibrary().stringClass,
-                    getLanguage().stringShape,
-                    false,
-                    repeated,
-                    libString.getEncoding(string));
-            AllocationTracing.trace(instance, this);
-            return instance;
+            return createString(repeated, libString.getEncoding(string));
         }
 
         @Specialization(guards = { "times > 0", "isEmpty(libString.getRope(string))" })
@@ -452,15 +388,7 @@ public abstract class StringNodes {
                 @Cached @Shared("repeatNode") RepeatNode repeatNode,
                 @CachedLibrary(limit = "2") RubyStringLibrary libString) {
             final Rope repeated = repeatNode.executeRepeat(libString.getRope(string), 0);
-
-            final RubyString instance = new RubyString(
-                    coreLibrary().stringClass,
-                    getLanguage().stringShape,
-                    false,
-                    repeated,
-                    libString.getEncoding(string));
-            AllocationTracing.trace(instance, this);
-            return instance;
+            return createString(repeated, libString.getEncoding(string));
         }
 
         @Specialization(guards = { "times > 0", "!isEmpty(strings.getRope(string))" })
@@ -542,30 +470,12 @@ public abstract class StringNodes {
 
     @Primitive(name = "dup_as_string_instance")
     public abstract static class StringDupAsStringInstanceNode extends PrimitiveArrayArgumentsNode {
-
-        public static StringDupAsStringInstanceNode create() {
-            return StringDupAsStringInstanceNodeFactory.create(null);
-        }
-
-        public abstract RubyString executeDupAsStringInstance(Object a);
-
         @Specialization
         protected RubyString dupAsStringInstance(Object string,
                 @CachedLibrary(limit = "2") RubyStringLibrary strings) {
-
-            final Rope rope = strings.getRope(string);
             final RubyEncoding encoding = strings.getEncoding(string);
-
-            final RubyString ret = new RubyString(
-                    coreLibrary().stringClass,
-                    getLanguage().stringShape,
-                    false,
-                    rope,
-                    encoding);
-            AllocationTracing.trace(ret, this);
-            return ret;
+            return createString(strings.getTString(string), encoding);
         }
-
     }
 
     @CoreMethod(names = { "<<", "concat" }, optional = 1, rest = true, raiseIfNotMutableSelf = true)
@@ -607,11 +517,11 @@ public abstract class StringNodes {
                 @Cached("rest.length") int cachedLength,
                 @Cached StringConcatNode argConcatNode,
                 @Cached ConditionProfile selfArgProfile) {
-            Rope rope = string.rope;
+            var tstring = string.tstring;
             Object result = argConcatNode.executeConcat(string, first, EMPTY_ARGUMENTS);
             for (int i = 0; i < cachedLength; ++i) {
                 final Object argOrCopy = selfArgProfile.profile(rest[i] == string)
-                        ? createString(this, rope, string.encoding)
+                        ? createString(tstring, string.encoding)
                         : rest[i];
                 result = argConcatNode.executeConcat(string, argOrCopy, EMPTY_ARGUMENTS);
             }
@@ -623,11 +533,11 @@ public abstract class StringNodes {
         protected Object concatManyGeneral(RubyString string, Object first, Object[] rest,
                 @Cached StringConcatNode argConcatNode,
                 @Cached ConditionProfile selfArgProfile) {
-            Rope rope = string.rope;
+            var tstring = string.tstring;
             Object result = argConcatNode.executeConcat(string, first, EMPTY_ARGUMENTS);
             for (Object arg : rest) {
                 if (selfArgProfile.profile(arg == string)) {
-                    Object copy = createString(this, rope, string.encoding);
+                    Object copy = createString(tstring, string.encoding);
                     result = argConcatNode.executeConcat(string, copy, EMPTY_ARGUMENTS);
                 } else {
                     result = argConcatNode.executeConcat(string, arg, EMPTY_ARGUMENTS);
@@ -798,8 +708,7 @@ public abstract class StringNodes {
                 @Cached @Exclusive DispatchNode callNode,
                 @Cached ReadCallerVariablesNode readCallerStorageNode,
                 @Cached ConditionProfile unsetProfile,
-                @Cached ConditionProfile sameThreadProfile,
-                @Cached StringDupAsStringInstanceNode dupNode) {
+                @Cached ConditionProfile sameThreadProfile) {
             final Object capture = RubyGuards.wasProvided(maybeCapture) ? maybeCapture : 0;
             final Object matchStrPair = callNode.call(
                     getContext().getCoreLibrary().truffleStringOperationsModule,
@@ -815,7 +724,7 @@ public abstract class StringNodes {
             } else {
                 final Object[] array = (Object[]) ((RubyArray) matchStrPair).store;
                 variables.setLastMatch(array[0], getContext(), unsetProfile, sameThreadProfile);
-                return dupNode.executeDupAsStringInstance(array[1]);
+                return array[1];
             }
         }
 
@@ -826,13 +735,13 @@ public abstract class StringNodes {
         protected Object slice2(Object string, Object matchStr, NotProvided length,
                 @CachedLibrary(limit = "2") RubyStringLibrary stringsMatchStr,
                 @Cached @Exclusive DispatchNode includeNode,
-                @Cached BooleanCastNode booleanCastNode,
-                @Cached @Exclusive StringDupAsStringInstanceNode dupNode) {
+                @Cached BooleanCastNode booleanCastNode) {
 
             final Object included = includeNode.call(string, "include?", matchStr);
 
             if (booleanCastNode.executeToBoolean(included)) {
-                return dupNode.executeDupAsStringInstance(matchStr);
+                final RubyEncoding encoding = stringsMatchStr.getEncoding(matchStr);
+                return createString(stringsMatchStr.getTString(matchStr), encoding);
             }
 
             return nil;
@@ -1174,9 +1083,11 @@ public abstract class StringNodes {
         }
 
         protected RubyEncoding findEncoding(RopeWithEncoding ropeWithEnc, RopeWithEncoding[] ropes) {
-            RubyEncoding enc = checkEncodingNode.executeCheckEncoding(ropeWithEnc, ropes[0]);
+            RubyEncoding enc = checkEncodingNode.executeCheckEncoding(ropeWithEnc.getRope(), ropeWithEnc.getEncoding(),
+                    ropes[0].getRope(), ropes[0].getEncoding());
             for (int i = 1; i < ropes.length; i++) {
-                enc = checkEncodingNode.executeCheckEncoding(ropeWithEnc, ropes[i]);
+                enc = checkEncodingNode.executeCheckEncoding(ropeWithEnc.getRope(), ropeWithEnc.getEncoding(),
+                        ropes[i].getRope(), ropes[i].getEncoding());
             }
             return enc;
         }
@@ -1438,6 +1349,8 @@ public abstract class StringNodes {
             for (int i = 0; i < bytes.length; i++) {
                 callBlock(block, bytes[i] & 0xff);
 
+                // Don't be tempted to extract the rope from the passed string. If the block being yielded to modifies the
+                // source string, you'll get a different rope.
                 Rope updatedRope = strings.getRope(string);
                 if (ropeChangedProfile.profile(rope != updatedRope)) {
                     rope = updatedRope;
@@ -1454,60 +1367,33 @@ public abstract class StringNodes {
     @ImportStatic(StringGuards.class)
     public abstract static class EachCharNode extends YieldingCoreMethodNode {
 
-        @Child private SubstringNode substringNode = SubstringNode.create();
-        @Child private BytesNode bytesNode = BytesNode.create();
-
         @Specialization
         protected Object eachChar(Object string, RubyProc block,
                 @CachedLibrary(limit = "2") RubyStringLibrary strings,
                 @Cached CalculateCharacterLengthNode calculateCharacterLengthNode,
-                @Cached CodeRangeNode codeRangeNode) {
+                @Cached CodeRangeNode codeRangeNode,
+                @Cached TruffleString.GetInternalByteArrayNode bytesNode,
+                @Cached TruffleString.SubstringByteIndexNode substringByteIndexNode) {
+            // Unlike String#each_byte, String#each_char does not make
+            // modifications to the string visible to the rest of the iteration.
             final Rope rope = strings.getRope(string);
+            var tstring = strings.getTString(string);
             final RubyEncoding encoding = strings.getEncoding(string);
-            final byte[] ptrBytes = bytesNode.execute(rope);
-            final int len = ptrBytes.length;
-            final Encoding enc = rope.getEncoding();
+            var bytes = bytesNode.execute(tstring, encoding.tencoding);
+            final int len = bytes.getLength();
+            final int end = bytes.getOffset() + len;
             final CodeRange cr = codeRangeNode.execute(rope);
 
-            int n;
-
-            for (int i = 0; i < len; i += n) {
-                n = calculateCharacterLengthNode
-                        .characterLengthWithRecovery(enc, cr, Bytes.fromRange(ptrBytes, i, len));
-                callBlock(block, substr(rope, encoding, i, n, coreLibrary().stringClass));
+            int clen;
+            for (int i = 0; i < len; i += clen) {
+                clen = calculateCharacterLengthNode.characterLengthWithRecovery(encoding.jcoding, cr,
+                        Bytes.fromRange(bytes.getArray(), bytes.getOffset() + i, end));
+                callBlock(block, createSubString(substringByteIndexNode, tstring, encoding, i, clen));
             }
 
             return string;
         }
 
-        // TODO (nirvdrum 10-Mar-15): This was extracted from JRuby, but likely will need to become a primitive.
-        // Don't be tempted to extract the rope from the passed string. If the block being yielded to modifies the
-        // source string, you'll get a different rope. Unlike String#each_byte, String#each_char does not make
-        // modifications to the string visible to the rest of the iteration.
-        private Object substr(Rope rope, RubyEncoding encoding, int beg, int len, RubyClass logicalClass) {
-            int length = rope.byteLength();
-            if (len < 0 || beg > length) {
-                return nil;
-            }
-
-            if (beg < 0) {
-                beg += length;
-                if (beg < 0) {
-                    return nil;
-                }
-            }
-
-            int end = Math.min(length, beg + len);
-            final Rope substringRope = substringNode.executeSubstring(rope, beg, end - beg);
-            final RubyString ret = new RubyString(
-                    logicalClass,
-                    getLanguage().stringShape,
-                    false,
-                    substringRope,
-                    encoding);
-            AllocationTracing.trace(ret, this);
-            return ret;
-        }
     }
 
     @CoreMethod(names = "force_encoding", required = 1, raiseIfNotMutableSelf = true)
@@ -2219,65 +2105,36 @@ public abstract class StringNodes {
     @ImportStatic(StringGuards.class)
     public abstract static class DumpNode extends CoreMethodArrayArgumentsNode {
 
-        @Child private MakeLeafRopeNode makeLeafRopeNode = MakeLeafRopeNode.create();
+        private static final byte[] FORCE_ENCODING_CALL_BYTES = RopeOperations.encodeAsciiBytes(".force_encoding(\"");
 
         @TruffleBoundary
         @Specialization(guards = "isAsciiCompatible(libString.getRope(string))")
         protected RubyString dumpAsciiCompatible(Object string,
-                @CachedLibrary(limit = "2") RubyStringLibrary libString) {
-            // Taken from org.jruby.RubyString#dump
+                @CachedLibrary(limit = "2") RubyStringLibrary libString,
+                @Cached TruffleString.FromByteArrayNode fromByteArrayNode) {
+            ByteArrayBuilder outputBytes = dumpCommon(libString.getRope(string));
 
-            RopeBuilder outputBytes = dumpCommon(libString.getRope(string));
-            outputBytes.setEncoding(libString.getRope(string).getEncoding());
-
-            final Rope rope = makeLeafRopeNode
-                    .executeMake(outputBytes.getBytes(), outputBytes.getEncoding(), CR_7BIT, outputBytes.getLength());
-
-            final RubyString result = new RubyString(
-                    coreLibrary().stringClass,
-                    getLanguage().stringShape,
-                    false,
-                    rope,
-                    libString.getEncoding(string));
-            AllocationTracing.trace(result, this);
-            return result;
+            return createString(fromByteArrayNode, outputBytes.getBytes(), libString.getEncoding(string));
         }
 
         @TruffleBoundary
         @Specialization(guards = "!isAsciiCompatible(libString.getRope(string))")
         protected RubyString dump(Object string,
-                @CachedLibrary(limit = "2") RubyStringLibrary libString) {
-            // Taken from org.jruby.RubyString#dump
+                @CachedLibrary(limit = "2") RubyStringLibrary libString,
+                @Cached TruffleString.FromByteArrayNode fromByteArrayNode) {
+            ByteArrayBuilder outputBytes = dumpCommon(libString.getRope(string));
 
-            RopeBuilder outputBytes = dumpCommon(libString.getRope(string));
-
-            try {
-                outputBytes.append(".force_encoding(\"".getBytes("UTF-8"));
-            } catch (UnsupportedEncodingException e) {
-                throw new UnsupportedOperationException(e);
-            }
-
+            outputBytes.append(FORCE_ENCODING_CALL_BYTES);
             outputBytes.append(libString.getRope(string).getEncoding().getName());
             outputBytes.append((byte) '"');
             outputBytes.append((byte) ')');
 
-            outputBytes.setEncoding(ASCIIEncoding.INSTANCE);
-
-            final Rope rope = makeLeafRopeNode
-                    .executeMake(outputBytes.getBytes(), outputBytes.getEncoding(), CR_7BIT, outputBytes.getLength());
-
-            final RubyString result = new RubyString(
-                    coreLibrary().stringClass,
-                    getLanguage().stringShape,
-                    false,
-                    rope,
-                    Encodings.BINARY);
-            AllocationTracing.trace(result, this);
-            return result;
+            return createString(fromByteArrayNode, outputBytes.getBytes(), Encodings.BINARY);
         }
 
-        private RopeBuilder dumpCommon(Rope rope) {
-            RopeBuilder buf = null;
+        // Taken from org.jruby.RubyString#dump
+        private ByteArrayBuilder dumpCommon(Rope rope) {
+            ByteArrayBuilder buf = null;
             final Encoding enc = rope.getEncoding();
             final CodeRange cr = rope.getCodeRange();
 
@@ -2303,7 +2160,7 @@ public abstract class StringNodes {
                         len += 2;
                         break;
                     case '#':
-                        len += isEVStr(bytes, p, end) ? 2 : 1;
+                        len += p < end && isEVStr(bytes[p] & 0xff) ? 2 : 1;
                         break;
                     default:
                         if (ASCIIEncoding.INSTANCE.isPrint(c)) {
@@ -2313,7 +2170,7 @@ public abstract class StringNodes {
                                 int n = StringSupport.characterLength(enc, cr, bytes, p - 1, end) - 1;
                                 if (n > 0) {
                                     if (buf == null) {
-                                        buf = new RopeBuilder();
+                                        buf = new ByteArrayBuilder();
                                     }
                                     int cc = StringSupport.codePoint(enc, rope.getCodeRange(), bytes, p - 1, end, this);
                                     buf.append(StringUtils.formatASCIIBytes("%x", cc));
@@ -2330,12 +2187,12 @@ public abstract class StringNodes {
             }
 
             if (!enc.isAsciiCompatible()) {
-                len += ".force_encoding(\"".length() + enc.getName().length + "\")".length();
+                len += FORCE_ENCODING_CALL_BYTES.length + enc.getName().length + "\")".length();
             }
 
             RopeBuilder outBytes = new RopeBuilder();
             outBytes.unsafeEnsureSpace(len);
-            byte out[] = outBytes.getUnsafeBytes();
+            byte[] out = outBytes.getUnsafeBytes();
             int q = 0;
             p = 0;
             end = rope.byteLength();
@@ -2347,7 +2204,7 @@ public abstract class StringNodes {
                     out[q++] = '\\';
                     out[q++] = (byte) c;
                 } else if (c == '#') {
-                    if (isEVStr(bytes, p, end)) {
+                    if (p < end && isEVStr(bytes[p] & 0xff)) {
                         out[q++] = '\\';
                     }
                     out[q++] = '#';
@@ -2400,10 +2257,6 @@ public abstract class StringNodes {
             assert out == outBytes.getUnsafeBytes(); // must not reallocate
 
             return outBytes;
-        }
-
-        private static boolean isEVStr(byte[] bytes, int p, int end) {
-            return p < end ? isEVStr(bytes[p] & 0xff) : false;
         }
 
         private static boolean isEVStr(int c) {
@@ -2784,21 +2637,12 @@ public abstract class StringNodes {
 
         @Specialization(guards = "isStringSubclass(string)")
         protected RubyString toSOnSubclass(RubyString string) {
-            final Shape shape = getLanguage().stringShape;
-            final RubyString result = new RubyString(
-                    coreLibrary().stringClass,
-                    shape,
-                    false,
-                    string.rope,
-                    string.encoding);
-            AllocationTracing.trace(result, this);
-            return result;
+            return createString(string.tstring, string.encoding);
         }
 
         public boolean isStringSubclass(RubyString string) {
             return string.getLogicalClass() != coreLibrary().stringClass;
         }
-
     }
 
     @CoreMethod(names = { "to_sym", "intern" })
@@ -3545,8 +3389,8 @@ public abstract class StringNodes {
 
         @Specialization
         protected RubyString stringAppend(RubyString string, Object other) {
-            final RopeWithEncoding result = stringAppendNode.executeStringAppend(string, other);
-            string.setRope(result.getRope(), result.getEncoding());
+            final RubyString result = stringAppendNode.executeStringAppend(string, other);
+            string.setTString(result.tstring, result.encoding);
             return string;
         }
 
@@ -3560,7 +3404,6 @@ public abstract class StringNodes {
         @Child private CallBlockNode yieldNode = CallBlockNode.create();
         @Child CodeRangeNode codeRangeNode = CodeRangeNode.create();
         @Child private GetCodePointNode getCodePointNode = GetCodePointNode.create();
-        @Child private StringSubstringNode substringNode = StringSubstringNode.create();
 
         private static final int SUBSTRING_CREATED = -1;
 
@@ -3570,11 +3413,14 @@ public abstract class StringNodes {
                 @Cached ConditionProfile executeBlockProfile,
                 @Cached ConditionProfile growArrayProfile,
                 @Cached ConditionProfile trailingSubstringProfile,
-                @Cached ConditionProfile trailingEmptyStringProfile) {
+                @Cached ConditionProfile trailingEmptyStringProfile,
+                @Cached TruffleString.SubstringByteIndexNode substringByteIndexNode) {
             Object[] ret = new Object[10];
             int storeIndex = 0;
 
             final Rope rope = strings.getRope(string);
+            var tString = strings.getTString(string);
+            final RubyEncoding encoding = strings.getEncoding(string);
             final byte[] bytes = bytesNode.execute(rope);
 
             int substringStart = 0;
@@ -3584,8 +3430,8 @@ public abstract class StringNodes {
                     if (findingSubstringEnd) {
                         findingSubstringEnd = false;
 
-                        final RubyString substring = substringNode
-                                .executeSubstring(string, substringStart, i - substringStart);
+                        final RubyString substring = createSubString(substringByteIndexNode, tString, encoding,
+                                substringStart, i - substringStart);
                         ret = addSubstring(
                                 ret,
                                 storeIndex++,
@@ -3608,13 +3454,14 @@ public abstract class StringNodes {
             }
 
             if (trailingSubstringProfile.profile(substringStart != SUBSTRING_CREATED)) {
-                final RubyString substring = substringNode
-                        .executeSubstring(string, substringStart, bytes.length - substringStart);
+                final RubyString substring = createSubString(substringByteIndexNode, tString, encoding, substringStart,
+                        bytes.length - substringStart);
                 ret = addSubstring(ret, storeIndex++, substring, block, executeBlockProfile, growArrayProfile);
             }
 
             if (trailingEmptyStringProfile.profile(limit < 0 && StringSupport.isAsciiSpace(bytes[bytes.length - 1]))) {
-                final RubyString substring = substringNode.executeSubstring(string, bytes.length - 1, 0);
+                final RubyString substring = createSubString(substringByteIndexNode, tString, encoding,
+                        bytes.length - 1, 0);
                 ret = addSubstring(ret, storeIndex++, substring, block, executeBlockProfile, growArrayProfile);
             }
 
@@ -3631,12 +3478,14 @@ public abstract class StringNodes {
                 @CachedLibrary(limit = "2") RubyStringLibrary strings,
                 @Cached ConditionProfile executeBlockProfile,
                 @Cached ConditionProfile growArrayProfile,
-                @Cached ConditionProfile trailingSubstringProfile) {
+                @Cached ConditionProfile trailingSubstringProfile,
+                @Cached TruffleString.SubstringByteIndexNode substringByteIndexNode) {
             Object[] ret = new Object[10];
             int storeIndex = 0;
 
             final Rope rope = strings.getRope(string);
-            final RubyEncoding rubyEncoding = strings.getEncoding(string);
+            var tString = strings.getTString(string);
+            final RubyEncoding encoding = strings.getEncoding(string);
             final boolean limitPositive = limit > 0;
             int i = limit > 0 ? 1 : 0;
 
@@ -3651,7 +3500,7 @@ public abstract class StringNodes {
 
             int e = 0, b = 0;
             while (p < end) {
-                final int c = getCodePointNode.executeGetCodePoint(rubyEncoding, rope, p);
+                final int c = getCodePointNode.executeGetCodePoint(encoding, rope, p);
                 p += StringSupport.characterLength(enc, cr, bytes, p, end, true);
 
                 if (skip) {
@@ -3666,7 +3515,7 @@ public abstract class StringNodes {
                     }
                 } else {
                     if (StringSupport.isSpace(enc, c)) {
-                        final RubyString substring = substringNode.executeSubstring(string, b, e - b);
+                        var substring = createSubString(substringByteIndexNode, tString, encoding, b, e - b);
                         ret = addSubstring(
                                 ret,
                                 storeIndex++,
@@ -3686,7 +3535,7 @@ public abstract class StringNodes {
             }
 
             if (trailingSubstringProfile.profile(len > 0 && (limitPositive || len > b || limit < 0))) {
-                final RubyString substring = substringNode.executeSubstring(string, b, len - b);
+                var substring = createSubString(substringByteIndexNode, tString, encoding, b, len - b);
                 ret = addSubstring(ret, storeIndex++, substring, block, executeBlockProfile, growArrayProfile);
             }
 
@@ -3719,7 +3568,6 @@ public abstract class StringNodes {
     public abstract static class StringByteSubstringPrimitiveNode extends PrimitiveArrayArgumentsNode {
 
         @Child private NormalizeIndexNode normalizeIndexNode = NormalizeIndexNode.create();
-        @Child private StringSubstringNode substringNode = StringSubstringNode.create();
 
         public static StringByteSubstringPrimitiveNode create() {
             return StringByteSubstringPrimitiveNodeFactory.create(null);
@@ -3729,30 +3577,19 @@ public abstract class StringNodes {
 
         @Specialization
         protected Object stringByteSubstring(Object string, int index, NotProvided length,
-                @Cached ConditionProfile negativeLengthProfile,
                 @Cached ConditionProfile indexOutOfBoundsProfile,
-                @Cached ConditionProfile lengthTooLongProfile,
-                @Cached ConditionProfile nilSubstringProfile,
-                @Cached ConditionProfile emptySubstringProfile,
-                @CachedLibrary(limit = "2") RubyStringLibrary libString) {
-            final Object subString = stringByteSubstring(
-                    string,
-                    index,
-                    1,
-                    negativeLengthProfile,
-                    indexOutOfBoundsProfile,
-                    lengthTooLongProfile,
-                    libString);
+                @CachedLibrary(limit = "2") RubyStringLibrary libString,
+                @Cached TruffleString.SubstringByteIndexNode substringByteIndexNode) {
+            var tString = libString.getTString(string);
+            var encoding = libString.getEncoding(string);
+            final int stringByteLength = tString.byteLength(encoding.tencoding);
+            final int normalizedIndex = normalizeIndexNode.executeNormalize(index, stringByteLength);
 
-            if (nilSubstringProfile.profile(subString == nil)) {
-                return subString;
-            }
-
-            if (emptySubstringProfile.profile(((RubyString) subString).rope.isEmpty())) {
+            if (indexOutOfBoundsProfile.profile(normalizedIndex < 0 || normalizedIndex >= stringByteLength)) {
                 return nil;
             }
 
-            return subString;
+            return createSubString(substringByteIndexNode, tString, encoding, normalizedIndex, 1);
         }
 
         @Specialization
@@ -3760,13 +3597,15 @@ public abstract class StringNodes {
                 @Cached ConditionProfile negativeLengthProfile,
                 @Cached ConditionProfile indexOutOfBoundsProfile,
                 @Cached ConditionProfile lengthTooLongProfile,
-                @CachedLibrary(limit = "2") RubyStringLibrary libString) {
+                @CachedLibrary(limit = "2") RubyStringLibrary libString,
+                @Cached TruffleString.SubstringByteIndexNode substringByteIndexNode) {
             if (negativeLengthProfile.profile(length < 0)) {
                 return nil;
             }
 
-            final Rope rope = libString.getRope(string);
-            final int stringByteLength = rope.byteLength();
+            var tString = libString.getTString(string);
+            var encoding = libString.getEncoding(string);
+            final int stringByteLength = tString.byteLength(encoding.tencoding);
             final int normalizedIndex = normalizeIndexNode.executeNormalize(index, stringByteLength);
 
             if (indexOutOfBoundsProfile.profile(normalizedIndex < 0 || normalizedIndex > stringByteLength)) {
@@ -3774,10 +3613,10 @@ public abstract class StringNodes {
             }
 
             if (lengthTooLongProfile.profile(normalizedIndex + length > stringByteLength)) {
-                length = rope.byteLength() - normalizedIndex;
+                length = stringByteLength - normalizedIndex;
             }
 
-            return substringNode.executeSubstring(string, normalizedIndex, length);
+            return createSubString(substringByteIndexNode, tString, encoding, normalizedIndex, length);
         }
 
         @Fallback
@@ -4048,8 +3887,6 @@ public abstract class StringNodes {
     @ImportStatic(StringGuards.class)
     public abstract static class StringFindCharacterNode extends CoreMethodArrayArgumentsNode {
 
-        @Child private StringSubstringNode substringNode = StringSubstringNode.create();
-
         @Specialization(guards = "offset < 0")
         protected Object stringFindCharacterNegativeOffset(Object string, int offset) {
             return nil;
@@ -4068,10 +3905,10 @@ public abstract class StringNodes {
                         "isSingleByteOptimizable(strings.getRope(string), singleByteOptimizableNode)" })
         protected Object stringFindCharacterSingleByte(Object string, int offset,
                 @CachedLibrary(limit = "2") RubyStringLibrary strings,
-                @Cached SingleByteOptimizableNode singleByteOptimizableNode) {
+                @Cached SingleByteOptimizableNode singleByteOptimizableNode,
+                @Cached TruffleString.SubstringByteIndexNode substringByteIndexNode) {
             // Taken from Rubinius's String::find_character.
-
-            return substringNode.executeSubstring(string, offset, 1);
+            return createSubString(substringByteIndexNode, strings, string, offset, 1);
         }
 
         @Specialization(
@@ -4084,7 +3921,8 @@ public abstract class StringNodes {
                 @Cached GetBytesObjectNode getBytesObject,
                 @Cached CalculateCharacterLengthNode calculateCharacterLengthNode,
                 @Cached CodeRangeNode codeRangeNode,
-                @Cached SingleByteOptimizableNode singleByteOptimizableNode) {
+                @Cached SingleByteOptimizableNode singleByteOptimizableNode,
+                @Cached TruffleString.SubstringByteIndexNode substringByteIndexNode) {
             // Taken from Rubinius's String::find_character.
 
             final Rope rope = strings.getRope(string);
@@ -4094,7 +3932,7 @@ public abstract class StringNodes {
             final int clen = calculateCharacterLengthNode
                     .characterLength(enc, cr, getBytesObject.getClamped(rope, offset, enc.maxLength()));
 
-            return substringNode.executeSubstring(string, offset, clen);
+            return createSubString(substringByteIndexNode, strings, string, offset, clen);
         }
 
         protected static boolean offsetTooLarge(Rope rope, int offset) {
@@ -5256,9 +5094,8 @@ public abstract class StringNodes {
 
         @Child private NormalizeIndexNode normalizeIndexNode = NormalizeIndexNode.create();
         @Child CharacterLengthNode characterLengthNode = CharacterLengthNode.create();
-        @Child SingleByteOptimizableNode singleByteOptimizableNode = SingleByteOptimizableNode
-                .create();
-        @Child private SubstringNode substringNode;
+        @Child SingleByteOptimizableNode singleByteOptimizableNode = SingleByteOptimizableNode.create();
+        @Child private TruffleString.SubstringByteIndexNode substringByteIndexNode;
 
         public abstract Object execute(Object string, int index, int length);
 
@@ -5283,7 +5120,7 @@ public abstract class StringNodes {
                 characterLength = ropeCharacterLength - normalizedIndex;
             }
 
-            return makeRope(string, encoding, rope, normalizedIndex, characterLength);
+            return makeRope(encoding, rope, normalizedIndex, characterLength);
         }
 
         @Specialization(guards = {
@@ -5323,7 +5160,6 @@ public abstract class StringNodes {
             if (foundSingleByteOptimizableDescendentProfile
                     .profile(singleByteOptimizableNode.execute(searchResult.rope))) {
                 return makeRope(
-                        string,
                         encoding,
                         searchResult.rope,
                         searchResult.index,
@@ -5430,8 +5266,9 @@ public abstract class StringNodes {
             // Taken from org.jruby.RubyString#substr19 & org.jruby.RubyString#multibyteSubstr19.
 
             final Rope rope = libString.getRope(string);
+            var tstring = libString.getTString(string);
             final RubyEncoding encoding = libString.getEncoding(string);
-            final int length = rope.byteLength();
+            final int length = tstring.byteLength(encoding.tencoding);
 
             int p;
             final int end = length;
@@ -5445,24 +5282,20 @@ public abstract class StringNodes {
                 substringByteLength = StringSupport.offset(p, end, pp);
             }
 
-            return makeRope(string, encoding, rope, p, substringByteLength);
+            return makeRope(encoding, tstring, p, substringByteLength);
         }
 
-        private RubyString makeRope(Object string, RubyEncoding encoding, Rope rope, int beg, int byteLength) {
-            if (substringNode == null) {
+        private RubyString makeRope(RubyEncoding encoding, Rope rope, int beg, int byteLength) {
+            return makeRope(encoding, TStringUtils.fromRope(rope, encoding), beg, byteLength);
+        }
+
+        private RubyString makeRope(RubyEncoding encoding, AbstractTruffleString tstring, int beg, int byteLength) {
+            if (substringByteIndexNode == null) {
                 CompilerDirectives.transferToInterpreterAndInvalidate();
-                substringNode = insert(SubstringNode.create());
+                substringByteIndexNode = insert(TruffleString.SubstringByteIndexNode.create());
             }
 
-            final Rope substringRope = substringNode.executeSubstring(rope, beg, byteLength);
-            final RubyString ret = new RubyString(
-                    coreLibrary().stringClass,
-                    getLanguage().stringShape,
-                    false,
-                    substringRope,
-                    encoding);
-            AllocationTracing.trace(ret, this);
-            return ret;
+            return createSubString(substringByteIndexNode, tstring, encoding, beg, byteLength);
         }
 
         protected static boolean indexTriviallyOutOfBounds(Rope rope,
@@ -5514,21 +5347,20 @@ public abstract class StringNodes {
             return StringAppendNodeGen.create();
         }
 
-        public abstract RopeWithEncoding executeStringAppend(Object string, Object other);
+        public abstract RubyString executeStringAppend(Object string, Object other);
 
         @Specialization(guards = "libOther.isRubyString(other)")
-        protected RopeWithEncoding stringAppend(Object string, Object other,
+        protected RubyString stringAppend(Object string, Object other,
                 @CachedLibrary(limit = "2") RubyStringLibrary libString,
                 @CachedLibrary(limit = "2") RubyStringLibrary libOther) {
             final Rope left = libString.getRope(string);
             final Rope right = libOther.getRope(other);
 
-            final RubyEncoding compatibleEncoding = executeCheckEncoding(
-                    stringToRopeWithEncoding(libString, string),
-                    stringToRopeWithEncoding(libOther, other));
+            final RubyEncoding compatibleEncoding = executeCheckEncoding(left, libString.getEncoding(string), right,
+                    libOther.getEncoding(other));
 
             final Rope result = executeConcat(left, right, compatibleEncoding);
-            return new RopeWithEncoding(result, compatibleEncoding);
+            return createString(result, compatibleEncoding);
         }
 
         private Rope executeConcat(Rope left, Rope right, RubyEncoding compatibleEncoding) {
@@ -5539,16 +5371,13 @@ public abstract class StringNodes {
             return concatNode.executeConcat(left, right, compatibleEncoding.jcoding);
         }
 
-        private RubyEncoding executeCheckEncoding(RopeWithEncoding string, RopeWithEncoding other) {
+        private RubyEncoding executeCheckEncoding(Rope first, RubyEncoding firstEncoding, Rope second,
+                RubyEncoding secondEncoding) {
             if (checkEncodingNode == null) {
                 CompilerDirectives.transferToInterpreterAndInvalidate();
                 checkEncodingNode = insert(EncodingNodes.CheckStringEncodingNode.create());
             }
-            return checkEncodingNode.executeCheckEncoding(string, other);
-        }
-
-        protected RopeWithEncoding stringToRopeWithEncoding(RubyStringLibrary strings, Object string) {
-            return new RopeWithEncoding(strings.getRope(string), strings.getEncoding(string));
+            return checkEncodingNode.executeCheckEncoding(first, firstEncoding, second, secondEncoding);
         }
     }
 

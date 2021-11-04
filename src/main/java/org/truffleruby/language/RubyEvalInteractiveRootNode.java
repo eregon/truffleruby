@@ -25,11 +25,8 @@ public class RubyEvalInteractiveRootNode extends RubyBaseRootNode implements Int
 
     private final Rope sourceRope;
 
-    private final RubyLanguage language;
-
     public RubyEvalInteractiveRootNode(RubyLanguage language, Source source) {
         super(language, null, null);
-        this.language = language;
         this.sourceRope = StringOperations.encodeRope(source.getCharacters().toString(), UTF8Encoding.INSTANCE);
     }
 

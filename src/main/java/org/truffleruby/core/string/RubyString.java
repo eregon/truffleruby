@@ -11,8 +11,10 @@ package org.truffleruby.core.string;
 
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.library.ExportLibrary;
+import com.oracle.truffle.api.strings.AbstractTruffleString;
 import org.jcodings.Encoding;
 import org.truffleruby.core.encoding.RubyEncoding;
+import org.truffleruby.core.encoding.TStringUtils;
 import org.truffleruby.core.klass.RubyClass;
 import org.truffleruby.core.rope.Rope;
 import org.truffleruby.core.rope.RopeOperations;
@@ -33,25 +35,49 @@ public class RubyString extends RubyDynamicObject {
     public boolean frozen;
     public boolean locked = false;
     public Rope rope;
+    public AbstractTruffleString tstring;
     public RubyEncoding encoding;
 
+    public RubyString(
+            RubyClass rubyClass,
+            Shape shape,
+            boolean frozen,
+            AbstractTruffleString tstring,
+            RubyEncoding rubyEncoding) {
+        super(rubyClass, shape);
+        this.frozen = frozen;
+        this.tstring = tstring;
+        this.rope = TStringUtils.toRope(tstring, rubyEncoding);
+        assert rope.encoding == rubyEncoding.jcoding;
+        this.encoding = rubyEncoding;
+    }
+
+    @Deprecated
     public RubyString(RubyClass rubyClass, Shape shape, boolean frozen, Rope rope, RubyEncoding rubyEncoding) {
         super(rubyClass, shape);
         assert rope.encoding == rubyEncoding.jcoding;
         this.frozen = frozen;
         this.rope = rope;
+        this.tstring = TStringUtils.fromRope(rope, rubyEncoding);
         this.encoding = rubyEncoding;
     }
 
     public void setRope(Rope rope) {
-        assert rope.encoding == encoding.jcoding : rope.encoding.toString() + " does not equal " +
-                encoding.jcoding.toString();
+        assert rope.encoding == encoding.jcoding : rope.encoding + " does not equal " + encoding.jcoding;
         this.rope = rope;
+        this.tstring = TStringUtils.fromRope(rope, encoding);
     }
 
     public void setRope(Rope rope, RubyEncoding encoding) {
         assert rope.encoding == encoding.jcoding;
         this.rope = rope;
+        this.tstring = TStringUtils.fromRope(rope, encoding);
+        this.encoding = encoding;
+    }
+
+    public void setTString(AbstractTruffleString tstring, RubyEncoding encoding) {
+        this.rope = TStringUtils.toRope(tstring, encoding);
+        this.tstring = tstring;
         this.encoding = encoding;
     }
 
@@ -80,6 +106,11 @@ public class RubyString extends RubyDynamicObject {
     @ExportMessage
     protected Rope getRope() {
         return rope;
+    }
+
+    @ExportMessage
+    protected AbstractTruffleString getTString() {
+        return tstring;
     }
 
     @ExportMessage

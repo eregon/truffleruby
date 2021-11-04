@@ -145,17 +145,6 @@ public abstract class TruffleRopesNodes {
 
     }
 
-    @CoreMethod(names = "bytes?", onSingleton = true, required = 1)
-    public abstract static class HasBytesNode extends CoreMethodArrayArgumentsNode {
-
-        @Specialization(guards = "strings.isRubyString(string)")
-        protected boolean hasBytes(Object string,
-                @CachedLibrary(limit = "2") RubyStringLibrary strings) {
-            return strings.getRope(string).getRawBytes() != null;
-        }
-
-    }
-
     @CoreMethod(names = "flatten_rope", onSingleton = true, required = 1)
     public abstract static class FlattenRopeNode extends CoreMethodArrayArgumentsNode {
 

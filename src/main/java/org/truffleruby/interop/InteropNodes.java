@@ -20,6 +20,7 @@ import java.util.Map;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.interop.ExceptionType;
 import com.oracle.truffle.api.interop.NodeLibrary;
+import com.oracle.truffle.api.strings.TruffleString;
 import org.jcodings.specific.UTF8Encoding;
 import org.truffleruby.builtins.CoreMethod;
 import org.truffleruby.builtins.CoreMethodArrayArgumentsNode;
@@ -848,20 +849,50 @@ public abstract class InteropNodes {
             } catch (InteropException e) {
                 throw translateInteropException.execute(e);
             }
+            // TODO: should the resulting RubyString be marked as frozen?
             return fromJavaStringNode.executeFromJavaString(string);
         }
     }
 
     @CoreMethod(names = "as_string_without_conversion", onSingleton = true, required = 1)
     public abstract static class AsStringWithoutConversionNode extends CoreMethodArrayArgumentsNode {
-
         @Specialization(limit = "getInteropCacheLimit()")
         protected String asString(Object receiver,
                 @CachedLibrary("receiver") InteropLibrary receivers,
                 @Cached TranslateInteropExceptionNode translateInteropException) {
-
             try {
                 return receivers.asString(receiver);
+            } catch (InteropException e) {
+                throw translateInteropException.execute(e);
+            }
+        }
+    }
+
+    @CoreMethod(names = "as_truffle_string", onSingleton = true, required = 1)
+    public abstract static class AsTruffleStringNode extends CoreMethodArrayArgumentsNode {
+        @Specialization(limit = "getInteropCacheLimit()")
+        protected RubyString asString(Object receiver,
+                @CachedLibrary("receiver") InteropLibrary receivers,
+                @Cached TranslateInteropExceptionNode translateInteropException) {
+            final TruffleString truffleString;
+            try {
+                truffleString = receivers.asTruffleString(receiver);
+            } catch (InteropException e) {
+                throw translateInteropException.execute(e);
+            }
+            // TODO: should the resulting RubyString be marked as frozen?
+            return createString(truffleString, Encodings.UTF_8);
+        }
+    }
+
+    @CoreMethod(names = "as_truffle_string_without_conversion", onSingleton = true, required = 1)
+    public abstract static class AsTruffleStringWithoutConversionNode extends CoreMethodArrayArgumentsNode {
+        @Specialization(limit = "getInteropCacheLimit()")
+        protected TruffleString asString(Object receiver,
+                @CachedLibrary("receiver") InteropLibrary receivers,
+                @Cached TranslateInteropExceptionNode translateInteropException) {
+            try {
+                return receivers.asTruffleString(receiver);
             } catch (InteropException e) {
                 throw translateInteropException.execute(e);
             }

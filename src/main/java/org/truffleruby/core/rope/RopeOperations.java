@@ -31,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
+import com.oracle.truffle.api.strings.TruffleString;
 import org.jcodings.Encoding;
 import org.jcodings.ascii.AsciiTables;
 import org.jcodings.specific.ASCIIEncoding;
@@ -39,6 +40,9 @@ import org.jcodings.specific.UTF8Encoding;
 import org.truffleruby.collections.IntStack;
 import org.truffleruby.core.Hashing;
 import org.truffleruby.core.encoding.EncodingManager;
+import org.truffleruby.core.encoding.Encodings;
+import org.truffleruby.core.encoding.RubyEncoding;
+import org.truffleruby.core.encoding.TStringUtils;
 import org.truffleruby.core.rope.ConcatRope.ConcatState;
 import org.truffleruby.core.rope.RopeNodesFactory.WithEncodingNodeGen;
 import org.truffleruby.core.string.StringAttributes;
@@ -93,7 +97,7 @@ public class RopeOperations {
     }
 
     @TruffleBoundary
-    public static LeafRope create(byte b, Encoding encoding, CodeRange codeRange) {
+    public static LeafRope create(byte b, Encoding encoding, CodeRange codeRange) { // DEAD CODE
         final int index = b & 0xff;
 
         if (encoding == UTF8Encoding.INSTANCE) {
@@ -130,6 +134,23 @@ public class RopeOperations {
         } else {
             return new ValidLeafRope(RopeConstants.EMPTY_BYTES, encoding, 0);
         }
+    }
+
+    public static TruffleString emptyTString(RubyEncoding encoding) {
+        if (encoding == Encodings.UTF_8) {
+            return RopeConstants.EMPTY_UTF8_TSTRING;
+        }
+
+        if (encoding == Encodings.US_ASCII) {
+            return RopeConstants.EMPTY_US_ASCII_TSTRING;
+        }
+
+        if (encoding == Encodings.BINARY) {
+            return RopeConstants.EMPTY_BINARY_TSTRING;
+        }
+
+        // TODO should use node, or even try SwitchEncodingNode here
+        return TStringUtils.fromByteArray(RopeConstants.EMPTY_BYTES, encoding);
     }
 
     public static Rope withEncoding(Rope originalRope, Encoding newEncoding) {

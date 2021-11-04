@@ -14,6 +14,7 @@ import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.library.ExportLibrary;
 import com.oracle.truffle.api.library.ExportMessage;
+import com.oracle.truffle.api.strings.TruffleString;
 import org.jcodings.Encoding;
 import org.jcodings.specific.USASCIIEncoding;
 import org.truffleruby.RubyContext;
@@ -36,11 +37,13 @@ import java.util.Set;
 public class RubyEncoding extends ImmutableRubyObject implements ObjectGraphNode, Comparable<RubyEncoding> {
 
     public final Encoding jcoding;
+    public final TruffleString.Encoding tencoding;
     public final ImmutableRubyString name;
     public final int index;
 
     public RubyEncoding(Encoding jcoding, ImmutableRubyString name, int index) {
         this.jcoding = Objects.requireNonNull(jcoding);
+        this.tencoding = Objects.requireNonNull(TStringUtils.jcodingToTEncoding(jcoding));
         this.name = Objects.requireNonNull(name);
         this.index = index;
     }
@@ -48,6 +51,7 @@ public class RubyEncoding extends ImmutableRubyObject implements ObjectGraphNode
     // Special constructor to define US-ASCII encoding which is used for RubyEncoding names
     public RubyEncoding(int index) {
         this.jcoding = Objects.requireNonNull(USASCIIEncoding.INSTANCE);
+        this.tencoding = Objects.requireNonNull(TruffleString.Encoding.US_ASCII);
         this.name = Objects.requireNonNull(
                 FrozenStringLiterals.createStringAndCacheLater((LeafRope) RopeConstants.US_ASCII, this));
         this.index = index;
