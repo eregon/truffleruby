@@ -67,6 +67,10 @@ class IO
   SEEK_CUR = Truffle::Config['platform.io.SEEK_CUR']
   SEEK_END = Truffle::Config['platform.io.SEEK_END']
 
+  READABLE = 1
+  PRIORITY = 2
+  WRITABLE = 4
+
   # InternalBuffer provides a sliding window into a region of bytes.
   # The buffer is filled to the +used+ indicator, which is
   # always less than or equal to +total+. As bytes are taken
