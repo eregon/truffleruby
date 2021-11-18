@@ -75,8 +75,8 @@ import org.truffleruby.builtins.Primitive;
 import org.truffleruby.builtins.PrimitiveArrayArgumentsNode;
 import org.truffleruby.builtins.UnaryCoreMethodNode;
 import org.truffleruby.core.encoding.Encodings;
+import org.truffleruby.core.fiber.RubyFiber;
 import org.truffleruby.core.klass.RubyClass;
-import org.truffleruby.core.thread.RubyThread;
 import org.truffleruby.core.thread.ThreadManager.BlockingAction;
 import org.truffleruby.extra.ffi.Pointer;
 import org.truffleruby.extra.ffi.RubyPointer;
@@ -505,34 +505,34 @@ public abstract class IONodes {
 
     }
 
-    @Primitive(name = "io_thread_buffer_allocate")
-    public abstract static class IOThreadBufferAllocateNode extends PrimitiveArrayArgumentsNode {
+    @Primitive(name = "io_fiber_buffer_allocate")
+    public abstract static class IOFiberBufferAllocateNode extends PrimitiveArrayArgumentsNode {
 
         @Specialization
         protected RubyPointer getThreadBuffer(long size,
                 @Cached ConditionProfile sizeProfile) {
-            RubyThread thread = getLanguage().getCurrentThread();
+            RubyFiber fiber = getLanguage().getCurrentThread().getCurrentFiber();
             final RubyPointer instance = new RubyPointer(
                     coreLibrary().truffleFFIPointerClass,
                     getLanguage().truffleFFIPointerShape,
-                    getBuffer(thread, size, sizeProfile));
+                    getBuffer(fiber, size, sizeProfile));
             AllocationTracing.trace(instance, this);
             return instance;
         }
 
-        public static Pointer getBuffer(RubyThread rubyThread, long size, ConditionProfile sizeProfile) {
-            return rubyThread.ioBuffer.allocate(rubyThread, size, sizeProfile);
+        public static Pointer getBuffer(RubyFiber fiber, long size, ConditionProfile sizeProfile) {
+            return fiber.ioBuffer.allocate(fiber, size, sizeProfile);
         }
     }
 
-    @Primitive(name = "io_thread_buffer_free")
-    public abstract static class IOThreadBufferFreeNode extends PrimitiveArrayArgumentsNode {
+    @Primitive(name = "io_fiber_buffer_free")
+    public abstract static class IOFiberBufferFreeNode extends PrimitiveArrayArgumentsNode {
 
         @Specialization
         protected Object getThreadBuffer(RubyPointer pointer,
                 @Cached ConditionProfile freeProfile) {
-            RubyThread thread = getLanguage().getCurrentThread();
-            thread.ioBuffer.free(thread, pointer.pointer, freeProfile);
+            RubyFiber fiber = getLanguage().getCurrentThread().getCurrentFiber();
+            fiber.ioBuffer.free(fiber, pointer.pointer, freeProfile);
             return nil;
         }
     }

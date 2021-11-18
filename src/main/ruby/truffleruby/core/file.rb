@@ -878,7 +878,7 @@ class File < IO
       path = expand_path(path, basedir)
     end
 
-    buffer = Primitive.io_thread_buffer_allocate(Truffle::Platform::PATH_MAX)
+    buffer = Primitive.io_fiber_buffer_allocate(Truffle::Platform::PATH_MAX)
     begin
       if ptr = Truffle::POSIX.realpath(path, buffer) and !ptr.null?
         real = ptr.read_string
@@ -886,7 +886,7 @@ class File < IO
         Errno.handle(path)
       end
     ensure
-      Primitive.io_thread_buffer_free(buffer)
+      Primitive.io_fiber_buffer_free(buffer)
     end
 
     unless exist? real

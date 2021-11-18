@@ -89,6 +89,7 @@ public final class RubyFiber extends RubyBlockable {
     public final ValueWrapperManager.HandleBlockHolder handleData;
     boolean blocking = true;
     public Object blockProc = Nil.INSTANCE;
+    public FiberLocalBuffer ioBuffer = FiberLocalBuffer.NULL_BUFFER;
 
     public RubyFiber(
             RubyClass rubyClass,

@@ -266,7 +266,7 @@ module Truffle::FFI
   end
 
   class Pool
-    # Use Primitive.io_thread_buffer_allocate(Primitive.pointer_find_type_size(:type) * n)
+    # Use Primitive.io_fiber_buffer_allocate(Primitive.pointer_find_type_size(:type) * n)
     # instead for a single pointer.
     # This method always returns an Array of 1 + args.size FFI::Pointer, the first pointer is the full buffer to pass to #stack_free,
     # followed by args.size pointers, one for each argument.
@@ -280,14 +280,14 @@ module Truffle::FFI
         offsets << [total_length, length]
         total_length += length
       end
-      buffer = Primitive.io_thread_buffer_allocate(total_length)
+      buffer = Primitive.io_fiber_buffer_allocate(total_length)
       [buffer, *offsets.map { |offset, length| buffer.slice(offset, length) }]
     end
 
     # The argument is the first pointer (typically named buffer) returned by #stack_alloc.
     # It needs to be a FFI::Pointer with the full allocated size, so the primitive knows how much to free.
     def self.stack_free(buffer)
-      Primitive.io_thread_buffer_free(buffer)
+      Primitive.io_fiber_buffer_free(buffer)
     end
   end
 end

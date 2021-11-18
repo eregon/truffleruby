@@ -30,11 +30,11 @@ import org.truffleruby.core.array.ArrayOperations;
 import org.truffleruby.core.array.ArrayUtils;
 import org.truffleruby.core.array.RubyArray;
 import org.truffleruby.core.encoding.EncodingManager;
+import org.truffleruby.core.fiber.RubyFiber;
 import org.truffleruby.core.module.RubyModule;
 import org.truffleruby.core.string.RubyString;
 import org.truffleruby.core.string.StringOperations;
-import org.truffleruby.core.support.IONodes.IOThreadBufferAllocateNode;
-import org.truffleruby.core.thread.RubyThread;
+import org.truffleruby.core.support.IONodes.IOFiberBufferAllocateNode;
 import org.truffleruby.extra.TruffleRubyNodes;
 import org.truffleruby.extra.ffi.Pointer;
 import org.truffleruby.interop.InteropNodes;
@@ -204,9 +204,9 @@ public class FeatureLoader {
             return context.getEnv().getCurrentWorkingDirectory().getPath();
         }
         final int bufferSize = PATH_MAX;
-        final RubyThread rubyThread = language.getCurrentThread();
-        final Pointer buffer = IOThreadBufferAllocateNode
-                .getBuffer(rubyThread, bufferSize, ConditionProfile.getUncached());
+        final RubyFiber rubyFiber = language.getCurrentThread().getCurrentFiber();
+        final Pointer buffer = IOFiberBufferAllocateNode
+                .getBuffer(rubyFiber, bufferSize, ConditionProfile.getUncached());
         try {
             final long address;
             try {
@@ -224,7 +224,7 @@ public class FeatureLoader {
             final Encoding localeEncoding = context.getEncodingManager().getLocaleEncoding().jcoding;
             return new String(bytes, EncodingManager.charsetForEncoding(localeEncoding));
         } finally {
-            rubyThread.ioBuffer.free(rubyThread, buffer, ConditionProfile.getUncached());
+            rubyFiber.ioBuffer.free(rubyFiber, buffer, ConditionProfile.getUncached());
         }
     }
 

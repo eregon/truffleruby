@@ -35,7 +35,7 @@ module Truffle
     def self.readdir_multiple(dir, resolve_type, exclude_self_and_parent, entries)
       dir.__send__(:ensure_open)
       dirptr = Primitive.object_ivar_get(dir, :@ptr)
-      dirents = Primitive.io_thread_buffer_allocate(MULTIPLE_READS_BUFFER_SIZE)
+      dirents = Primitive.io_fiber_buffer_allocate(MULTIPLE_READS_BUFFER_SIZE)
       begin
         res = Truffle::POSIX.truffleposix_readdir_multiple(dirptr, MULTIPLE_READS_BUFFER_SIZE, resolve_type, exclude_self_and_parent, dirents)
         num_read = dirents.read_int
@@ -55,7 +55,7 @@ module Truffle
         Errno.handle unless Errno.errno == 0
         res
       ensure
-        Primitive.io_thread_buffer_free(dirents)
+        Primitive.io_fiber_buffer_free(dirents)
       end
     end
 

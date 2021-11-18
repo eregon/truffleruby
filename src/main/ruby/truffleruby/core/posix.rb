@@ -401,7 +401,7 @@ module Truffle::POSIX
 
   def self.read_string_native(io, length)
     fd = io.fileno
-    buffer = Primitive.io_thread_buffer_allocate(length)
+    buffer = Primitive.io_fiber_buffer_allocate(length)
     begin
       bytes_read = Truffle::POSIX.read(fd, buffer, length)
       if bytes_read < 0
@@ -420,13 +420,13 @@ module Truffle::POSIX
         [buffer.read_string(bytes_read), 0]
       end
     ensure
-      Primitive.io_thread_buffer_free(buffer)
+      Primitive.io_fiber_buffer_free(buffer)
     end
   end
 
   def self.read_to_buffer_native(io, length)
     fd = io.fileno
-    buffer = Primitive.io_thread_buffer_allocate(length)
+    buffer = Primitive.io_fiber_buffer_allocate(length)
     begin
       bytes_read = Truffle::POSIX.read(fd, buffer, length)
       if bytes_read < 0
@@ -446,14 +446,14 @@ module Truffle::POSIX
         [bytes_read, 0]
       end
     ensure
-      Primitive.io_thread_buffer_free(buffer)
+      Primitive.io_fiber_buffer_free(buffer)
     end
   end
 
   def self.read_to_buffer_polyglot(io, length, &block)
     fd = io.fileno
     if fd == 0
-      buffer = Primitive.io_thread_buffer_allocate(length)
+      buffer = Primitive.io_fiber_buffer_allocate(length)
       begin
         read = Primitive.io_read_polyglot length
         if read
@@ -465,7 +465,7 @@ module Truffle::POSIX
           [0, 0]
         end
       ensure
-        Primitive.io_thread_buffer_free(buffer)
+        Primitive.io_fiber_buffer_free(buffer)
       end
     else
       read_to_buffer_native(io, length, &block)
@@ -488,7 +488,7 @@ module Truffle::POSIX
   def self.write_string_native(io, string, continue_on_eagain)
     fd = io.fileno
     length = string.bytesize
-    buffer = Primitive.io_thread_buffer_allocate(length)
+    buffer = Primitive.io_fiber_buffer_allocate(length)
     begin
       buffer.write_bytes string
 
@@ -516,7 +516,7 @@ module Truffle::POSIX
       end
       written
     ensure
-      Primitive.io_thread_buffer_free(buffer)
+      Primitive.io_fiber_buffer_free(buffer)
     end
   end
 
@@ -541,7 +541,7 @@ module Truffle::POSIX
   def self.write_string_nonblock_native(io, string)
     fd = io.fileno
     length = string.bytesize
-    buffer = Primitive.io_thread_buffer_allocate(length)
+    buffer = Primitive.io_fiber_buffer_allocate(length)
     begin
       buffer.write_bytes string
       written = Truffle::POSIX.write(fd, buffer, length)
@@ -556,7 +556,7 @@ module Truffle::POSIX
       end
       written
     ensure
-      Primitive.io_thread_buffer_free(buffer)
+      Primitive.io_fiber_buffer_free(buffer)
     end
   end
 

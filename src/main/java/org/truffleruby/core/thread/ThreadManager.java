@@ -397,8 +397,6 @@ public class ThreadManager {
     public void cleanupThreadState(RubyThread thread, Thread javaThread) {
         context.fiberManager.cleanup(thread.getRootFiber(), javaThread);
 
-        thread.ioBuffer.freeAll(thread);
-
         unregisterThread(thread);
         thread.thread = null;
 

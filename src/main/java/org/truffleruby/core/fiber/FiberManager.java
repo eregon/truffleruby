@@ -134,6 +134,8 @@ public class FiberManager {
             final RuntimeException exception = ThreadManager.printInternalError(e);
             lastMessage = new FiberExceptionMessage(exception);
         } finally {
+            fiber.ioBuffer.freeAll(fiber);
+
             final RubyFiber returnFiber = lastMessage == null ? null : getReturnFiber(fiber, currentNode, UNPROFILED);
 
             // Perform all cleanup before resuming the parent Fiber

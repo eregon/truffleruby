@@ -318,14 +318,14 @@ class Dir
     alias_method :unlink, :rmdir
 
     def getwd
-      ptr = Primitive.io_thread_buffer_allocate(Truffle::Platform::PATH_MAX)
+      ptr = Primitive.io_fiber_buffer_allocate(Truffle::Platform::PATH_MAX)
       begin
         wd = Truffle::POSIX.getcwd(ptr, Truffle::Platform::PATH_MAX)
         Errno.handle unless wd
 
         Truffle::Type.external_string wd
       ensure
-        Primitive.io_thread_buffer_free(ptr)
+        Primitive.io_fiber_buffer_free(ptr)
       end
     end
     alias_method :pwd, :getwd

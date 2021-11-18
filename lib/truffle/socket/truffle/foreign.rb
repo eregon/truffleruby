@@ -97,25 +97,25 @@ module Truffle
       attach_function :freeifaddrs, [:pointer], :void
 
       def self.bind(descriptor, sockaddr)
-        sockaddr_p = Primitive.io_thread_buffer_allocate(sockaddr.bytesize)
+        sockaddr_p = Primitive.io_fiber_buffer_allocate(sockaddr.bytesize)
         begin
           sockaddr_p.write_bytes(sockaddr)
           _bind(descriptor, sockaddr_p, sockaddr.bytesize)
         ensure
-          Primitive.io_thread_buffer_free(sockaddr_p)
+          Primitive.io_fiber_buffer_free(sockaddr_p)
         end
       end
 
       def self.connect(descriptor, sockaddr)
         sockaddr = Socket.coerce_to_string(sockaddr)
 
-        sockaddr_p = Primitive.io_thread_buffer_allocate(sockaddr.bytesize)
+        sockaddr_p = Primitive.io_fiber_buffer_allocate(sockaddr.bytesize)
         begin
           sockaddr_p.write_bytes(sockaddr)
 
           _connect(descriptor, sockaddr_p, sockaddr.bytesize)
         ensure
-          Primitive.io_thread_buffer_free(sockaddr_p)
+          Primitive.io_fiber_buffer_free(sockaddr_p)
         end
       end
 
@@ -143,7 +143,7 @@ module Truffle
         hints[:ai_protocol] = protocol || 0
         hints[:ai_flags]    = flags || 0
 
-        res_p = Primitive.io_thread_buffer_allocate(Primitive.pointer_find_type_size(:pointer))
+        res_p = Primitive.io_fiber_buffer_allocate(Primitive.pointer_find_type_size(:pointer))
 
         res_p.clear
         err = _getaddrinfo(host, service, hints.pointer, res_p)
@@ -183,7 +183,7 @@ module Truffle
 
           # Be sure to feed a legit pointer to freeaddrinfo
           freeaddrinfo(ptr) unless ptr.null?
-          Primitive.io_thread_buffer_free(res_p)
+          Primitive.io_fiber_buffer_free(res_p)
         end
       end
 
@@ -280,7 +280,7 @@ module Truffle
           host = '0.0.0.0'
         end
 
-        res_p = Primitive.io_thread_buffer_allocate(Primitive.pointer_find_type_size(:pointer))
+        res_p = Primitive.io_fiber_buffer_allocate(Primitive.pointer_find_type_size(:pointer))
         res_p.clear
 
         err = _getaddrinfo(host, port.to_s, hints.pointer, res_p)
@@ -299,7 +299,7 @@ module Truffle
           ptr = res_p.read_pointer
 
           freeaddrinfo(ptr) unless ptr.null?
-          Primitive.io_thread_buffer_free(res_p)
+          Primitive.io_fiber_buffer_free(res_p)
         end
       end
 
@@ -325,7 +325,7 @@ module Truffle
       end
 
       def self.socketpair(family, type, protocol)
-        pointer = Primitive.io_thread_buffer_allocate(Primitive.pointer_find_type_size(:int) * 2)
+        pointer = Primitive.io_fiber_buffer_allocate(Primitive.pointer_find_type_size(:int) * 2)
         begin
           pointer.clear
           status = _socketpair(family, type, protocol, pointer)
@@ -334,7 +334,7 @@ module Truffle
 
           pointer.read_array_of_int(2)
         ensure
-          Primitive.io_thread_buffer_free(pointer)
+          Primitive.io_fiber_buffer_free(pointer)
         end
       end
 
@@ -370,7 +370,7 @@ module Truffle
           address = address[0...i]
         end
 
-        pointer = Primitive.io_thread_buffer_allocate(Primitive.pointer_find_type_size(:pointer) * size)
+        pointer = Primitive.io_fiber_buffer_allocate(Primitive.pointer_find_type_size(:pointer) * size)
 
         begin
           status = inet_pton(family, address, pointer)
@@ -379,7 +379,7 @@ module Truffle
 
           pointer.get_array_of_uchar(0, size)
         ensure
-          Primitive.io_thread_buffer_free(pointer)
+          Primitive.io_fiber_buffer_free(pointer)
         end
       end
     end
