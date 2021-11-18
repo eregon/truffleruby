@@ -33,7 +33,12 @@ class UNIXSocket < BasicSocket
 
     fd0, fd1 = Truffle::Socket::Foreign.socketpair(family, type, protocol)
 
-    [for_fd(fd0), for_fd(fd1)]
+    res = [for_fd(fd0), for_fd(fd1)]
+    res[0].nonblock = true
+    res[1].nonblock = true
+    res[0].close_on_exec = true
+    res[1].close_on_exec = true
+    res
   end
 
   class << self
