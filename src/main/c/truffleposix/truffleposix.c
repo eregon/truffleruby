@@ -58,6 +58,7 @@ SUCH DAMAGE.
 #include <utime.h>
 
 #include <sys/file.h>
+#include <sys/ioctl.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/select.h>
@@ -443,6 +444,16 @@ mode_t truffleposix_lstat_mode(const char *path) {
     return native_stat.st_mode;
   }
   return 0;
+}
+
+int truffleposix_ioctl_fionread(int fd) {
+  int n;
+  int res = ioctl(fd, FIONREAD, &n);
+  if (res == 0) {
+    return n;
+  } else {
+    return 0;
+  }
 }
 
 unsigned int truffleposix_major(dev_t dev) {

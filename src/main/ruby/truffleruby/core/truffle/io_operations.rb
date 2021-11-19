@@ -361,5 +361,22 @@ module Truffle
       ret
     end
 
+    def self.wait_event_mask(symbols)
+      event = 0
+      symbols.each do |sym|
+        case sym
+        when :r, :read, :readable
+          event |= IO::READABLE
+        when :w, :write, :writable
+          event |= IO::WRITABLE
+        when :rw, :read_write, :readable_writable
+          event |= (IO::READABLE | IO::WRITABLE)
+        else
+          raise ArgumentError, "unsupported mode #{sym}"
+        end
+      end
+      event = IO::READABLE if event == 0
+      event
+    end
   end
 end
