@@ -527,8 +527,9 @@ module Truffle::POSIX
             end
             Errno.handle_errno(errno)
           end
+        else
+          written += ret
         end
-        written += ret
       end
       written
     ensure
