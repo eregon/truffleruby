@@ -2,6 +2,8 @@ require_relative '../spec_helper'
 require_relative '../fixtures/classes'
 require_relative 'shared/new'
 
+require 'io/nonblock'
+
 describe 'TCPSocket#initialize' do
   it_behaves_like :tcpsocket_new, :new
 end
@@ -49,6 +51,20 @@ describe 'TCPSocket#initialize' do
 
         @client.remote_address.ip_address.should == @server.local_address.ip_address
         @client.remote_address.ip_port.should    == @server.local_address.ip_port
+      end
+
+      ruby_version_is '3.0' do
+        it "creates a socket which is set to nonblocking" do
+          @client = TCPSocket.new(ip_address, @port)
+
+          @client.nonblock?.should be_true
+        end
+
+        it "creates a socket which is set to close on exec" do
+          @client = TCPSocket.new(ip_address, @port)
+
+          @client.close_on_exec?.should be_true
+        end
       end
 
       describe 'using a local address and service' do

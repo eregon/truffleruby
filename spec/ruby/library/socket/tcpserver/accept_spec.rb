@@ -1,5 +1,6 @@
 require_relative '../spec_helper'
 require_relative '../fixtures/classes'
+require 'io/nonblock'
 
 describe "TCPServer#accept" do
   before :each do
@@ -16,6 +17,9 @@ describe "TCPServer#accept" do
     t = Thread.new do
       client = @server.accept
       client.should be_kind_of(TCPSocket)
+      ruby_version_is '3.0' do
+        client.nonblock?.should be_true
+      end
       data = client.read(5)
       client << "goodbye"
       client.close

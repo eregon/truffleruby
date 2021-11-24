@@ -1,4 +1,5 @@
 require_relative '../spec_helper'
+require 'io/nonblock'
 
 describe 'UDPSocket#initialize' do
   after do
@@ -28,6 +29,18 @@ describe 'UDPSocket#initialize' do
   it 'sets the socket to binmode' do
     @socket = UDPSocket.new(:INET)
     @socket.binmode?.should be_true
+  end
+
+  ruby_version_is '3.0' do
+    it 'sets the socket to nonblock' do
+      @socket = UDPSocket.new(:INET)
+      @socket.nonblock?.should be_true
+    end
+
+    it 'sets the socket to close on exec' do
+      @socket = UDPSocket.new(:INET)
+      @socket.close_on_exec?.should be_true
+    end
   end
 
   it 'raises Errno::EAFNOSUPPORT or Errno::EPROTONOSUPPORT when given an invalid address family' do

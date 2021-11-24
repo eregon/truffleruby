@@ -20,6 +20,11 @@ platform_is_not :windows do
 
       sock = @server.accept
       begin
+        ruby_version_is '3.0' do
+          sock.nonblock?.should be_true
+          sock.close_on_exec?.should be_true
+        end
+
         data, info = sock.recvfrom(5)
 
         data.should == 'hello'
