@@ -117,6 +117,8 @@ class TCPSocket < IPSocket
     else
       IO.setup(self, descriptor, nil, true)
       binmode
+      self.nonblock = true
+      self.close_on_exec = true
     end
   end
 end

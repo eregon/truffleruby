@@ -38,6 +38,8 @@ class UDPSocket < IPSocket
 
     IO.setup(self, descriptor, nil, true)
     binmode
+    self.nonblock = true
+    self.close_on_exec = true
   end
 
   def bind(host, port)

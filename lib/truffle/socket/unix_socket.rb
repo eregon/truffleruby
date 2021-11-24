@@ -59,6 +59,9 @@ class UNIXSocket < BasicSocket
     sockaddr = Socket.sockaddr_un(Truffle::Type.check_null_safe(path))
     status   = Truffle::Socket::Foreign.connect(Primitive.io_fd(self), sockaddr)
 
+    self.nonblock = true
+    self.close_on_exec = true
+
     Errno.handle('connect(2)') if status < 0
   end
 

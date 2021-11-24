@@ -115,6 +115,9 @@ module Truffle
 
         socket = new_class.for_fd(fd)
 
+        socket.nonblock = true
+        socket.close_on_exec = true
+
         socktype = source.getsockopt(:SOCKET, :TYPE).int
         addrinfo = Addrinfo.new(sockaddr.to_s, sockaddr.family, socktype)
 
@@ -136,7 +139,12 @@ module Truffle
         end
       end
 
-      new_class.for_fd(fd)
+      socket = new_class.for_fd(fd)
+
+      socket.nonblock = true
+      socket.close_on_exec = true
+
+      socket
     end
 
     def self.listen(source, backlog)
