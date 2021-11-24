@@ -78,7 +78,7 @@ class UDPSocket < IPSocket
 
     flags = 0 if flags.nil?
 
-    internal_recvfrom(maxlen, flags | Socket::MSG_DONTWAIT, buffer, exception)
+    internal_recvfrom(maxlen, flags | Socket::MSG_DONTWAIT, buffer, exception, true)
   end
 
   def inspect

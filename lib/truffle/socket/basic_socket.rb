@@ -149,12 +149,13 @@ class BasicSocket < IO
     bytes_sent
   end
 
-  private def internal_recv(bytes_to_read, flags, buffer, exception)
-    Truffle::Socket::Foreign.memory_pointer(bytes_to_read) do |buf|
-      n_bytes = Truffle::Socket::Foreign.recv(Primitive.io_fd(self), buf, bytes_to_read, flags)
-
-      if n_bytes == -1
-        if !exception and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
+  private def internal_recv(bytes_to_read, flags, buffer, exception, nonblock = false)
+    buf = Primitive.io_fiber_buffer_allocate(bytes_to_read)
+    begin
+      while ((n_bytes = Truffle::Socket::Foreign.recv(Primitive.io_fd(self), buf, bytes_to_read, flags)) < 0)
+        if (nonblock == false) and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
+          wait_readable
+        elsif !exception and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
           return :wait_readable
         else
           Truffle::Socket::Error.read_error('recv(2)', self)
@@ -163,20 +164,22 @@ class BasicSocket < IO
 
       str = buf.read_string(n_bytes)
       buffer ? buffer.replace(str) : str
+    ensure
+      Primitive.io_fiber_buffer_free(buf)
     end
   end
 
   def recv(bytes_to_read, flags = 0, buf = nil)
-    internal_recv(bytes_to_read, flags, buf, true)
+    internal_recv(bytes_to_read, flags, buf, true, false)
   end
 
   private def __recv_nonblock(bytes_to_read, flags, buf, exception)
     self.nonblock = true
 
-    internal_recv(bytes_to_read, flags, buf, exception)
+    internal_recv(bytes_to_read, flags, buf, exception, true)
   end
 
-  private def internal_recvmsg(max_msg_len, flags, max_control_len, scm_rights, exception)
+  private def internal_recvmsg(max_msg_len, flags, max_control_len, scm_rights, exception, nonblock = false)
     socket_type = getsockopt(:SOCKET, :TYPE).int
 
     if socket_type == Socket::SOCK_STREAM
@@ -198,10 +201,15 @@ class BasicSocket < IO
       begin
         need_more = false
 
-        msg_size = Truffle::Socket::Foreign.recvmsg(Primitive.io_fd(self), header.pointer, flags)
-
-        if msg_size < 0
-          if !exception and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
+        while ((msg_size = Truffle::Socket::Foreign.recvmsg(Primitive.io_fd(self), header.pointer, flags)) < 0)
+          if (nonblock == false) and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
+            scheduler = Fiber.scheduler
+            if scheduler && !Fiber.blocking? && scheduler.respond_to?(:io_wait)
+              scheduler.io_wait(self, IO::READABLE, nil)
+            else
+              IO.select([self])
+            end
+          elsif !exception and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
             return :wait_readable
           else
             Truffle::Socket::Error.read_error('recvmsg(2)', self)
@@ -235,16 +243,16 @@ class BasicSocket < IO
   end
 
   private def __recvmsg(max_msg_len, flags, max_control_len, scm_rights)
-    internal_recvmsg(max_msg_len, flags, max_control_len, scm_rights, true)
+    internal_recvmsg(max_msg_len, flags, max_control_len, scm_rights, true, false)
   end
 
   private def __recvmsg_nonblock(max_msg_len, flags, max_control_len, scm_rights, exception)
     self.nonblock = true
 
-    internal_recvmsg(max_msg_len, flags | Socket::MSG_DONTWAIT, max_control_len, scm_rights, exception)
+    internal_recvmsg(max_msg_len, flags | Socket::MSG_DONTWAIT, max_control_len, scm_rights, exception, true)
   end
 
-  private def internal_sendmsg(message, flags, dest_sockaddr, exception)
+  private def internal_sendmsg(message, flags, dest_sockaddr, exception, nonblock = false)
     msg_buffer = Truffle::Socket::Foreign.char_pointer(message.bytesize)
     io_vec = Truffle::Socket::Foreign::Iovec.with_buffer(msg_buffer)
     header = Truffle::Socket::Foreign::Msghdr.new
@@ -264,10 +272,15 @@ class BasicSocket < IO
         header.address = address
       end
 
-      num_bytes = Truffle::Socket::Foreign.sendmsg(Primitive.io_fd(self), header.pointer, flags)
-
-      if num_bytes < 0
-        if !exception and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
+      while ((num_bytes = Truffle::Socket::Foreign.sendmsg(Primitive.io_fd(self), header.pointer, flags)) < 0)
+        if (nonblock == false) and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
+          scheduler = Fiber.scheduler
+          if scheduler && !Fiber.blocking? && scheduler.respond_to?(:io_wait)
+            scheduler.io_wait(self, IO::READABLE, nil)
+          else
+            IO.select([], [self])
+          end
+        elsif !exception and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
           return :wait_writable
         else
           Truffle::Socket::Error.read_error('sendmsg(2)', self)
@@ -284,13 +297,13 @@ class BasicSocket < IO
   end
 
   private def __sendmsg(message, flags, dest_sockaddr, controls)
-    internal_sendmsg(message, flags, dest_sockaddr, true)
+    internal_sendmsg(message, flags, dest_sockaddr, true, false)
   end
 
   private def __sendmsg_nonblock(message, flags, dest_sockaddr, controls, exception)
     self.nonblock = true
 
-    internal_sendmsg(message, flags | Socket::MSG_DONTWAIT, dest_sockaddr, exception)
+    internal_sendmsg(message, flags | Socket::MSG_DONTWAIT, dest_sockaddr, exception, true)
   end
 
   def close_read

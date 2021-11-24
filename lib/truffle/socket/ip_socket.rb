@@ -39,8 +39,8 @@ class IPSocket < BasicSocket
     Truffle::Socket.address_info(:getpeername, self, reverse_lookup)
   end
 
-  private def internal_recvfrom(maxlen, flags, buffer, exception)
-    message, addr = internal_recvmsg(maxlen, flags, nil, false, exception)
+  private def internal_recvfrom(maxlen, flags, buffer, exception, nonblock = false)
+    message, addr = internal_recvmsg(maxlen, flags, nil, false, exception, nonblock)
 
     return message if message == :wait_readable
 
@@ -65,6 +65,6 @@ class IPSocket < BasicSocket
 
   def recvfrom(maxlen, flags = 0)
     flags = 0 if flags.nil?
-    internal_recvfrom(maxlen, flags, nil, true)
+    internal_recvfrom(maxlen, flags, nil, true, false)
   end
 end
