@@ -234,22 +234,28 @@ module Truffle::FFI
   end
 
   class MemoryPointer < Pointer
-    def initialize(type, count = 1, clear = true)
+    def initialize(type, count = 1, clear = true, tmp_buffer = false)
       super(type, 0)
       total = @type_size * (count || 1)
 
-      Primitive.pointer_malloc self, total
+      if tmp_buffer
+        fiber_buffer = Primitive.io_fiber_buffer_allocate(total)
+        self.address = fiber_buffer.address
+        self.total = total
+      else
+        Primitive.pointer_malloc self, total
+      end
       Primitive.pointer_clear self, total if clear
     end
 
     def self.new(type, count = 1, clear = true)
-      ptr = super(type, count, clear)
+      ptr = super(type, count, clear, block_given?)
 
       if block_given?
         begin
           yield ptr
         ensure
-          ptr.free
+          Primitive.io_fiber_buffer_free(ptr)
         end
       else
         ptr.autorelease = true
