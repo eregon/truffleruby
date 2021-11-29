@@ -684,6 +684,12 @@ class IO
   def self.pipe(external = nil, internal = nil, options = nil)
     lhs, rhs = Truffle::IOOperations.create_pipe(self, self, external, internal, options)
 
+    # A pipe being used to communicate between two bits of Ruby code
+    # should be non-blocking as our IO routines can handle retries,
+    # and this allows fiber schedulers to work correctly.
+    lhs.nonblock = true
+    rhs.nonblock = true
+
     if block_given?
       begin
         yield lhs, rhs
@@ -742,8 +748,10 @@ class IO
     # Otherwise, we can just return the IO object for the proper half.
     read_class = (readable && writable) ? IO::BidirectionalPipe : self
 
+    # We create these pipe ends because we want to control which file
+    # descriptors are made non-blocking.
     pa_read, ch_write = Truffle::IOOperations.create_pipe(read_class, self) if readable
-    ch_read, pa_write = pipe if writable
+    ch_read, pa_write = Truffle::IOOperations.create_pipe(self, self) if writable
 
     if readable and writable
       pipe = pa_read
@@ -785,6 +793,7 @@ class IO
     end
 
     pipe.instance_variable_set :@pid, pid
+    pipe.nonblock = true
 
     ch_write.close if readable
     ch_read.close  if writable
