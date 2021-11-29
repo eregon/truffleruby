@@ -63,10 +63,30 @@ module FiberSpecs
       end
     end
 
+    def find_ready_fibers(ready_set)
+      waiting = {}
+
+      @lock.synchronize do
+        waiting, @waiting = @waiting, {} unless @waiting.empty?
+      end
+      time = current_time
+
+      waiting.each do |fiber, timeout|
+        if timeout <= time
+          @lock.synchronize do
+            ready_set << fiber
+          end
+        else
+          @lock.synchronize do
+            @waiting[fiber] = timeout
+          end
+        end
+      end
+    end
+
     def run
       while check_not_done
         ready = Set.new
-        waiting = {}
         @lock.synchronize do
           ready = @ready.dup unless @ready.empty?
         end
@@ -75,24 +95,7 @@ module FiberSpecs
           resume_execution(fiber)
         end
 
-        @lock.synchronize do
-          waiting, @waiting = @waiting, {} unless @waiting.empty?
-        end
-
-        time = current_time
-
-        waiting.each do |fiber, timeout|
-          if timeout <= time
-            @lock.synchronize do
-              @ready << fiber
-            end
-          else
-            @lock.synchronize do
-              @waiting[fiber] = timeout
-            end
-          end
-        end
-
+        find_ready_fibers(@ready)
       end
     end
 
@@ -152,6 +155,67 @@ module FiberSpecs
       ensure
         @lock.unlock
       end
+    end
+  end
+
+  class IOScheduler < BlockUnblockScheduler
+
+    def initialize(&block)
+      super
+      @read_waiting = {}
+      @write_waiting = {}
+    end
+
+    def find_ready_fibers(ready_set)
+      super
+
+      read_waiting = {}
+      write_waiting = {}
+
+      @lock.synchronize do
+        read_waiting, @read_waiting = @read_waiting, {}
+        write_waiting, @write_waiting = @write_waiting, {}
+      end
+
+      if !read_waiting.empty? or !write_waiting.empty?
+        readers = []
+        writers = []
+        read_waiting.each do |fiber, io|
+          readers << io
+        end
+        write_waiting.each do |fiber, io|
+          writers << io
+        end
+        readable, writable = IO.select(readers, writers, [], 0)
+
+        @lock.synchronize do
+          read_waiting.each do |fiber, io|
+            if readable && readable.include?(io)
+              ready_set << fiber
+            else
+              @read_waiting[fiber] = io
+            end
+          end
+
+          write_waiting.each do |fiber, io|
+            if writable && writable.include?(io)
+              ready_set << fiber
+            else
+              @write_waiting[fiber] = io
+            end
+          end
+        end
+      end
+    end
+
+    def io_wait(io, events, duration)
+
+      @read_waiting[Fiber.current] = io if events & IO::READABLE != 0
+      @write_waiting[Fiber.current] = io if events & IO::WRITABLE != 0
+
+      block(io, duration)
+
+      return true
     end
   end
 
