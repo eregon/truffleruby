@@ -18,50 +18,10 @@ import org.truffleruby.builtins.CoreModule;
 import org.truffleruby.builtins.Primitive;
 import org.truffleruby.core.mutex.MutexOperations;
 import org.truffleruby.core.mutex.RubyMutex;
-import org.truffleruby.core.proc.RubyProc;
 import org.truffleruby.core.thread.RubyThread;
-import org.truffleruby.language.control.RaiseException;
-import org.truffleruby.language.yield.CallBlockNode;
 
 @CoreModule("Truffle::MonitorOperations")
 public abstract class TruffleMonitorNodes {
-
-    @Primitive(name = "monitor_synchronize")
-    public abstract static class SynchronizeNode extends CoreMethodArrayArgumentsNode {
-
-        @Child private CallBlockNode yieldNode = CallBlockNode.create();
-
-        @Specialization
-        protected Object synchronizeOnMutex(RubyMutex mutex, RubyProc block,
-                @Cached BranchProfile errorProfile) {
-            /* Like Mutex#synchronize we must maintain the owned locks list here as the monitor might be exited inside
-             * synchronize block and then re-entered again before the end, and we have to make sure the list of owned
-             * locks remains consistent. */
-            final RubyThread thread = getLanguage().getCurrentThread();
-            MutexOperations.lock(getContext(), mutex.lock, thread, this);
-            try {
-                return yieldNode.yield(block);
-            } finally {
-                MutexOperations.checkOwnedMutex(getContext(), mutex.lock, this, errorProfile);
-                MutexOperations.unlock(mutex.lock, thread);
-            }
-        }
-
-        @Specialization(guards = "!isRubyProc(block)")
-        protected Object synchronizeOnMutexNoBlock(RubyMutex mutex, Object block) {
-            throw new RaiseException(getContext(), coreExceptions().localJumpError("no block given", this));
-        }
-    }
-
-    @Primitive(name = "monitor_try_enter")
-    public abstract static class MonitorTryEnter extends CoreMethodArrayArgumentsNode {
-
-        @Specialization
-        protected Object tryEnter(RubyMutex mutex) {
-            final RubyThread thread = getLanguage().getCurrentThread();
-            return MutexOperations.tryLock(mutex.lock, thread);
-        }
-    }
 
     @Primitive(name = "monitor_enter")
     public abstract static class MonitorEnter extends CoreMethodArrayArgumentsNode {
@@ -78,8 +38,10 @@ public abstract class TruffleMonitorNodes {
     public abstract static class MonitorExit extends CoreMethodArrayArgumentsNode {
 
         @Specialization
-        protected Object exit(RubyMutex mutex) {
+        protected Object exit(RubyMutex mutex,
+                @Cached BranchProfile errorProfile) {
             final RubyThread thread = getLanguage().getCurrentThread();
+            MutexOperations.checkOwnedMutex(getContext(), mutex.lock, this, errorProfile);
             MutexOperations.unlock(mutex.lock, thread);
             return mutex;
         }

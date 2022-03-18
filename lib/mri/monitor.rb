@@ -176,7 +176,12 @@ module MonitorMixin
   # Attempts to enter exclusive section.  Returns +false+ if lock fails.
   #
   def mon_try_enter
-    Primitive.monitor_try_enter(@mon_mutex)
+    if Primitive.mutex_try_lock(@mon_mutex)
+      Primitive.blockable_set_release_blocker(@mon_mutex, Truffle::FiberOperations::EMPTY_BLOCKER)
+      true
+    else
+      false
+    end
   end
   # For backward compatibility
   alias try_mon_enter mon_try_enter
@@ -185,14 +190,25 @@ module MonitorMixin
   # Enters exclusive section.
   #
   def mon_enter
-    Primitive.monitor_enter(@mon_mutex)
+    if Primitive.fiber_current_fiber_scheduling?
+      Truffle::FiberOperations.block_until_true(@mon_mutex, nil) do
+        Primitive.mutex_try_lock(@mon_mutex)
+      end
+    else
+      Primitive.monitor_enter(@mon_mutex)
+    end
+    Primitive.blockable_set_release_blocker(@mon_mutex, Truffle::FiberOperations::EMPTY_BLOCKER)
+    self
   end
 
   #
   # Leaves exclusive section.
   #
   def mon_exit
-    Primitive.monitor_exit(@mon_mutex)
+    blocker = Primitive.blockable_get_and_set_acquire_blocker(@mon_mutex, nil)
+    res = Primitive.monitor_exit(@mon_mutex)
+    Truffle::FiberOperations.unblock(blocker, @mon_mutex) if Primitive.fiber_scheduling?
+    res
   end
 
   #
@@ -215,7 +231,12 @@ module MonitorMixin
   # +MonitorMixin+.
   #
   def mon_synchronize(&block)
-    Primitive.monitor_synchronize(@mon_mutex, block)
+    mon_enter
+    begin
+      yield
+    ensure
+      mon_exit
+    end
   end
   Truffle::Graal.always_split instance_method(:mon_synchronize)
   alias synchronize mon_synchronize
