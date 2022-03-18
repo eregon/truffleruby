@@ -60,6 +60,10 @@ import org.truffleruby.core.exception.SystemCallErrorNodesBuiltins;
 import org.truffleruby.core.exception.SystemCallErrorNodesFactory;
 import org.truffleruby.core.exception.SystemExitNodesBuiltins;
 import org.truffleruby.core.exception.SystemExitNodesFactory;
+import org.truffleruby.core.fiber.BlockableNodesBuiltins;
+import org.truffleruby.core.fiber.BlockableNodesFactory;
+import org.truffleruby.core.fiber.BlockerNodesBuiltins;
+import org.truffleruby.core.fiber.BlockerNodesFactory;
 import org.truffleruby.core.fiber.FiberNodesBuiltins;
 import org.truffleruby.core.fiber.FiberNodesFactory;
 import org.truffleruby.core.hash.HashNodesBuiltins;
@@ -181,6 +185,8 @@ public abstract class BuiltinsClasses {
         AtomicReferenceNodesBuiltins.setup(coreManager);
         BasicObjectNodesBuiltins.setup(coreManager);
         BindingNodesBuiltins.setup(coreManager);
+        BlockableNodesBuiltins.setup(coreManager);
+        BlockerNodesBuiltins.setup(coreManager);
         ByteArrayNodesBuiltins.setup(coreManager);
         CExtNodesBuiltins.setup(coreManager);
         ClassNodesBuiltins.setup(coreManager);
@@ -262,6 +268,8 @@ public abstract class BuiltinsClasses {
         AtomicReferenceNodesBuiltins.setupPrimitives(primitiveManager);
         BasicObjectNodesBuiltins.setupPrimitives(primitiveManager);
         BindingNodesBuiltins.setupPrimitives(primitiveManager);
+        BlockableNodesBuiltins.setupPrimitives(primitiveManager);
+        BlockerNodesBuiltins.setupPrimitives(primitiveManager);
         ByteArrayNodesBuiltins.setupPrimitives(primitiveManager);
         CExtNodesBuiltins.setupPrimitives(primitiveManager);
         ClassNodesBuiltins.setupPrimitives(primitiveManager);
@@ -344,6 +352,8 @@ public abstract class BuiltinsClasses {
                 AtomicReferenceNodesFactory.getFactories(),
                 BasicObjectNodesFactory.getFactories(),
                 BindingNodesFactory.getFactories(),
+                BlockableNodesFactory.getFactories(),
+                BlockerNodesFactory.getFactories(),
                 ByteArrayNodesFactory.getFactories(),
                 CExtNodesFactory.getFactories(),
                 ClassNodesFactory.getFactories(),

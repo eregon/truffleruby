@@ -9,7 +9,7 @@
 # GNU Lesser General Public License version 2.1.
 
 class Fiber
-  def initialize(blocking: false, &block)
+  def initialize(blocking: false, **args, &block)
     Primitive.fiber_initialize(self, Primitive.as_boolean(blocking), block)
   end
 
@@ -25,4 +25,32 @@ class Fiber
     "#{super.delete_suffix('>')} #{loc} (#{status})>"
   end
   alias_method :to_s, :inspect
+
+  def self.scheduler
+    Primitive.thread_get_scheduler(Thread.current)
+  end
+
+  def self.set_scheduler(scheduler)
+    current_scheduler = Primitive.thread_get_scheduler(Thread.current)
+    current_scheduler.close if current_scheduler && current_scheduler.respond_to?(:close)
+    Primitive.thread_set_scheduler(Thread.current, scheduler)
+  end
+
+  def self.schedule(&block)
+    raise RuntimeError, 'No scheduler is available!' unless scheduler
+    scheduler.fiber(&block)
+  end
+
+  def self.yield(*args)
+    return Primitive.fiber_yield(args) unless Primitive.fiber_scheduling?
+    proc = Primitive.fiber_get_block_proc
+    blocker = proc ? proc.call(Primitive.fiber_current) : nil
+    Primitive.blockable_set_blocker(Primitive.fiber_current, blocker) if blocker
+    value = Primitive.fiber_yield(args)
+    if blocker
+      while !Primitive.blockable_compare_and_set_blocker(Primitive.fiber_current, blocker, nil) do
+      end
+    end
+    value
+  end
 end

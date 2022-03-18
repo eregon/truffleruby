@@ -71,6 +71,7 @@ import org.truffleruby.core.basicobject.RubyBasicObject;
 import org.truffleruby.core.encoding.Encodings;
 import org.truffleruby.core.exception.GetBacktraceException;
 import org.truffleruby.core.exception.RubyException;
+import org.truffleruby.core.fiber.RubyBlocker;
 import org.truffleruby.core.fiber.RubyFiber;
 import org.truffleruby.core.hash.RubyHash;
 import org.truffleruby.core.hash.library.HashStoreLibrary;
@@ -88,6 +89,7 @@ import org.truffleruby.interop.ForeignToRubyNode;
 import org.truffleruby.interop.TranslateInteropExceptionNode;
 import org.truffleruby.language.Nil;
 import org.truffleruby.language.NotProvided;
+import org.truffleruby.language.RubyDynamicObject;
 import org.truffleruby.language.SafepointAction;
 import org.truffleruby.language.SafepointManager;
 import org.truffleruby.language.Visibility;
@@ -413,15 +415,16 @@ public abstract class ThreadNodes {
     public abstract static class ThreadInitializeNode extends PrimitiveArrayArgumentsNode {
 
         @Specialization
-        protected Object initialize(VirtualFrame frame, RubyThread thread) {
+        protected Object initialize(VirtualFrame frame, RubyThread thread, Object blocker) {
             final ArgumentsDescriptor descriptor = RubyArguments.getDescriptor(frame);
             final Object[] args = RubyArguments.getRawArguments(frame);
             final RubyProc block = (RubyProc) RubyArguments.getBlock(frame);
-            return init(thread, block, descriptor, args);
+            return init(thread, blocker, block, descriptor, args);
         }
 
         @TruffleBoundary
-        private Object init(RubyThread thread, RubyProc block, ArgumentsDescriptor descriptor, Object[] args) {
+        private Object init(RubyThread thread, Object blocker, RubyProc block, ArgumentsDescriptor descriptor,
+                Object[] args) {
             final SourceSection sourceSection = block.getSharedMethodInfo().getSourceSection();
             final String info = getContext().fileLine(sourceSection);
             final String sharingReason = "creating Ruby Thread " + info;
@@ -431,12 +434,36 @@ public abstract class ThreadNodes {
                 SharedObjects.shareDeclarationFrame(getLanguage(), block, info);
             }
 
+            thread.setBlocker(blocker);
+
             getContext().getThreadManager().initialize(
                     thread,
                     this,
                     info,
                     sharingReason,
-                    () -> ProcOperations.rootCall(block, descriptor, args));
+                    () -> {
+                        try {
+                            try {
+                                return ProcOperations.rootCall(block, descriptor, args);
+                            } finally {
+                                /* Run scheduled fibers if the scheduler has been set. We preform the check in Java so
+                                 * that we will not introduce a safepoint where an exception might be raised unless a
+                                 * scheduler has been set. This is done to avoid races between raise and kill. */
+                                if (thread.scheduler != nil) {
+                                    RubyContext.send(this, getContext().getCoreLibrary().fiberClass, "set_scheduler",
+                                            nil);
+                                }
+                            }
+                        } finally {
+                            Object exitBlocker = thread.getAndSetReleaseBlocker(nil);
+                            if (getLanguage().isFiberScheduling() && exitBlocker != nil &&
+                                    !((RubyBlocker) exitBlocker).isEmpty()) {
+                                RubyContext.send(this, getContext().getCoreLibrary().truffleFiberOperationsModule,
+                                        "unblock",
+                                        exitBlocker, thread);
+                            }
+                        }
+                    });
             return nil;
         }
     }
@@ -1025,4 +1052,31 @@ public abstract class ThreadNodes {
             return foreignToRubyNode.executeConvert(result);
         }
     }
+
+    @Primitive(name = "thread_get_scheduler")
+    public abstract static class ThreadGetSchedulerNode extends PrimitiveArrayArgumentsNode {
+
+        @Specialization
+        protected Object getScheduler(RubyThread thread) {
+            return thread.scheduler;
+        }
+    }
+
+    @Primitive(name = "thread_set_scheduler")
+    public abstract static class ThreadSetSchedulerNode extends PrimitiveArrayArgumentsNode {
+
+        @Specialization
+        protected Object setNilScheduler(RubyThread thread, Nil scheduler) {
+            thread.scheduler = nil;
+            return nil;
+        }
+
+        @Specialization
+        protected Object setScheduler(RubyThread thread, RubyDynamicObject scheduler) {
+            getLanguage().startFiberScheduling();
+            thread.scheduler = scheduler;
+            return nil;
+        }
+    }
+
 }

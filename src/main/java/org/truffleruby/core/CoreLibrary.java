@@ -119,6 +119,7 @@ public class CoreLibrary {
     public final RubyClass arrayClass;
     public final RubyClass basicObjectClass;
     public final RubyClass bindingClass;
+    public final RubyClass blockerClass;
     public final RubyClass classClass;
     public final RubyClass complexClass;
     public final RubyClass dirClass;
@@ -191,6 +192,7 @@ public class CoreLibrary {
     public final RubyModule truffleInternalModule;
     public final RubyModule truffleBootModule;
     public final RubyModule truffleExceptionOperationsModule;
+    public final RubyModule truffleFiberOperationsModule;
     public final RubyModule truffleInteropModule;
     public final RubyClass unsupportedMessageExceptionClass;
     public final RubyClass invalidArrayIndexExceptionClass;
@@ -458,9 +460,12 @@ public class CoreLibrary {
         defineClass(truffleRubyModule, objectClass, "AtomicReference");
         defineClass(truffleRubyModule, objectClass, "ConcurrentMap");
         truffleModule = defineModule("Truffle");
+        defineClass(truffleModule, objectClass, "Blockable");
+        blockerClass = defineClass(truffleModule, objectClass, "Blocker");
         truffleInternalModule = defineModule(truffleModule, "Internal");
         graalErrorClass = defineClass(truffleModule, exceptionClass, "GraalError");
         truffleExceptionOperationsModule = defineModule(truffleModule, "ExceptionOperations");
+        truffleFiberOperationsModule = defineModule(truffleModule, "FiberOperations");
         truffleInteropModule = defineModule(truffleModule, "Interop");
         RubyClass interopExceptionClass = defineClass(
                 truffleInteropModule,
@@ -954,6 +959,7 @@ public class CoreLibrary {
             "/core/channel.rb",
             "/core/configuration.rb",
             "/core/false.rb",
+            "/core/truffle/fiber_operations.rb",
             "/core/fiber.rb",
             "/core/gc.rb",
             "/core/nil.rb",

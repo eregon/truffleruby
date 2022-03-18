@@ -119,7 +119,7 @@ class Thread
       raise ArgumentError, 'tried to create Proc object without a block' unless block_given?
 
       thread = Primitive.thread_allocate(self)
-      Primitive.thread_initialize(thread)
+      Primitive.thread_initialize(thread, Truffle::FiberOperations::EMPTY_BLOCKER)
       thread
     end
     alias_method :fork, :start
@@ -132,7 +132,7 @@ class Thread
     if Primitive.thread_initialized?(self)
       Kernel.raise ThreadError, 'already initialized thread'
     end
-    Primitive.thread_initialize(self)
+    Primitive.thread_initialize(self, Truffle::FiberOperations::EMPTY_BLOCKER)
   end
 
   def freeze

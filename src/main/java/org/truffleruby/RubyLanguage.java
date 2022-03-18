@@ -52,6 +52,7 @@ import org.truffleruby.core.exception.RubyNoMethodError;
 import org.truffleruby.core.exception.RubySyntaxError;
 import org.truffleruby.core.exception.RubySystemCallError;
 import org.truffleruby.core.exception.RubySystemExit;
+import org.truffleruby.core.fiber.RubyBlockable;
 import org.truffleruby.core.fiber.RubyFiber;
 import org.truffleruby.core.hash.RubyHash;
 import org.graalvm.options.OptionValues;
@@ -228,6 +229,11 @@ public final class RubyLanguage extends TruffleLanguage<RubyContext> {
     private final CyclicAssumption tracingCyclicAssumption = new CyclicAssumption("object-space-tracing");
     @CompilationFinal private volatile Assumption tracingAssumption = tracingCyclicAssumption.getAssumption();
 
+    private final CyclicAssumption fiberSchedulerCyclicAssumption = new CyclicAssumption("object-space-tracing");
+    @CompilationFinal private volatile Assumption fiberSchedulerAssumption = fiberSchedulerCyclicAssumption
+            .getAssumption();
+    @CompilationFinal private boolean isFiberSchedulerSet = false;
+
     @CompilationFinal public boolean singleContext = true;
     @CompilationFinal public Optional<RubyContext> contextIfSingleContext;
 
@@ -275,6 +281,7 @@ public final class RubyLanguage extends TruffleLanguage<RubyContext> {
     public final Shape arrayShape = createShape(RubyArray.class);
     public final Shape atomicReferenceShape = createShape(RubyAtomicReference.class);
     public final Shape bindingShape = createShape(RubyBinding.class);
+    public final Shape blockableShape = createShape(RubyBlockable.class);
     public final Shape byteArrayShape = createShape(RubyByteArray.class);
     public final Shape concurrentMapShape = createShape(RubyConcurrentMap.class);
     public final Shape conditionVariableShape = createShape(RubyConditionVariable.class);
@@ -393,6 +400,30 @@ public final class RubyLanguage extends TruffleLanguage<RubyContext> {
     public void invalidateTracingAssumption() {
         tracingCyclicAssumption.invalidate();
         tracingAssumption = tracingCyclicAssumption.getAssumption();
+    }
+
+    public Assumption getFiberSchedulerAssumption() {
+        return fiberSchedulerAssumption;
+    }
+
+    public void invalidateFiberSchedulerAssumption(String reason) {
+        fiberSchedulerCyclicAssumption.invalidate();
+        fiberSchedulerAssumption = fiberSchedulerCyclicAssumption.getAssumption();
+    }
+
+    public void startFiberScheduling() {
+        if (!isFiberScheduling()) {
+            CompilerDirectives.transferToInterpreterAndInvalidate();
+            isFiberSchedulerSet = true;
+            invalidateFiberSchedulerAssumption("FIber scheduler set.");
+        }
+    }
+
+    public boolean isFiberScheduling() {
+        if (!fiberSchedulerAssumption.isValid()) {
+            CompilerDirectives.transferToInterpreterAndInvalidate();
+        }
+        return isFiberSchedulerSet;
     }
 
     @Override

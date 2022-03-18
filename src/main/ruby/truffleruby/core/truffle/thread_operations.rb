@@ -165,4 +165,9 @@ module Truffle::ThreadOperations
     $stderr.write message
   end
 
+  def self.finish
+    Fiber.set_scheduler(nil)
+    blocker = Primitive.blockable_get_and_set_release_blocker(Thread.current, nil)
+    Truffle::FiberOperations.unblock(blocker, Thread.current) if Primitive.fiber_scheduling?
+  end
 end

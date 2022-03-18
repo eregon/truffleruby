@@ -41,6 +41,7 @@ Compatibility:
 * Fix arguments implicit type conversion for `BasicObject#instance_eval`, `Module#class_eval`, `Module#module_eval`, `Module#define_method` (@andrykonchin).
 * Raise `ArgumentError` unconditionally when `Proc.new` is called without a block argument (@andrykonchin).
 
+* Add basic support for fiber schedulers like CRuby (#2453, @aardvark179)
 
 Performance:
 

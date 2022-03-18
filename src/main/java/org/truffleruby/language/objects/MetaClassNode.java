@@ -12,6 +12,7 @@ package org.truffleruby.language.objects;
 import com.oracle.truffle.api.HostCompilerDirectives.InliningCutoff;
 import com.oracle.truffle.api.dsl.TypeSystemReference;
 import org.truffleruby.core.encoding.RubyEncoding;
+import org.truffleruby.core.fiber.RubyBlocker;
 import org.truffleruby.core.klass.RubyClass;
 import org.truffleruby.core.numeric.RubyBignum;
 import org.truffleruby.core.range.RubyIntOrLongRange;
@@ -102,6 +103,12 @@ public abstract class MetaClassNode extends RubyBaseNode {
     protected RubyClass metaClassIntRange(RubyIntOrLongRange value) {
         return coreLibrary().rangeClass;
     }
+
+    @Specialization
+    protected RubyClass metaClassBlocker(RubyBlocker value) {
+        return coreLibrary().blockerClass;
+    }
+
 
     // Cover all RubyDynamicObject cases with cached and uncached
 

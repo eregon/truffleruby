@@ -25,13 +25,11 @@ import org.truffleruby.core.basicobject.RubyBasicObject;
 import org.truffleruby.core.klass.RubyClass;
 import org.truffleruby.core.thread.RubyThread;
 import org.truffleruby.language.Nil;
-import org.truffleruby.language.RubyDynamicObject;
-import org.truffleruby.language.objects.ObjectGraphNode;
 
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.object.Shape;
 
-public final class RubyFiber extends RubyDynamicObject implements ObjectGraphNode {
+public final class RubyFiber extends RubyBlockable {
 
     // @formatter:off
     /*
@@ -90,6 +88,7 @@ public final class RubyFiber extends RubyDynamicObject implements ObjectGraphNod
     public final MarkingService.ExtensionCallStack extensionCallStack;
     public final ValueWrapperManager.HandleBlockHolder handleData;
     boolean blocking = true;
+    public Object blockProc = Nil.INSTANCE;
 
     public RubyFiber(
             RubyClass rubyClass,
@@ -134,8 +133,9 @@ public final class RubyFiber extends RubyDynamicObject implements ObjectGraphNod
 
     @Override
     public void getAdjacentObjects(Set<Object> reachable) {
+        super.getAdjacentObjects(reachable);
+        reachable.add(blockProc);
         reachable.add(fiberLocals);
         reachable.add(rubyThread);
     }
-
 }

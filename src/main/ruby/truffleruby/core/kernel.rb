@@ -496,6 +496,18 @@ module Kernel
   end
   module_function :select
 
+  def sleep(duration=undefined)
+    scheduler = Primitive.fiber_scheduler_if_needed
+    if scheduler
+      start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      scheduler.kernel_sleep(duration || nil)
+      (Process.clock_gettime(Process::CLOCK_MONOTONIC) - start_time).round
+    else
+      Primitive.kernel_sleep(Primitive.time_duration_to_nano(duration))
+    end
+  end
+  module_function :sleep
+
   def srand(seed=undefined)
     if Primitive.undefined? seed
       seed = Primitive.thread_randomizer.generate_seed

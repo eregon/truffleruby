@@ -19,6 +19,7 @@ import org.truffleruby.builtins.Primitive;
 import org.truffleruby.builtins.PrimitiveArrayArgumentsNode;
 import org.truffleruby.builtins.UnaryCoreMethodNode;
 import org.truffleruby.core.array.RubyArray;
+import org.truffleruby.core.array.library.ArrayStoreLibrary;
 import org.truffleruby.core.cast.SingleValueCastNode;
 import org.truffleruby.core.cast.SingleValueCastNodeGen;
 import org.truffleruby.core.encoding.Encodings;
@@ -38,8 +39,10 @@ import org.truffleruby.language.control.RaiseException;
 
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
+import com.oracle.truffle.api.dsl.Bind;
 import com.oracle.truffle.api.dsl.Cached;
 import com.oracle.truffle.api.dsl.Specialization;
+import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.profiles.BranchProfile;
 import com.oracle.truffle.api.profiles.ConditionProfile;
 import org.truffleruby.language.objects.AllocationTracing;
@@ -288,13 +291,15 @@ public abstract class FiberNodes {
 
     }
 
-    @CoreMethod(names = "yield", onSingleton = true, rest = true)
-    public abstract static class YieldNode extends CoreMethodArrayArgumentsNode {
+    @Primitive(name = "fiber_yield")
+    public abstract static class YieldNode extends PrimitiveArrayArgumentsNode {
 
         @Child private FiberTransferNode fiberTransferNode = FiberTransferNodeFactory.create(null);
 
-        @Specialization
-        protected Object fiberYield(VirtualFrame frame, Object[] rawArgs,
+        @Specialization(limit = "2")
+        protected Object fiberYield(VirtualFrame frame, RubyArray rawArgs,
+                @Bind("rawArgs.getStore()") Object store,
+                @CachedLibrary("store") ArrayStoreLibrary stores,
                 @Cached BranchProfile errorProfile) {
 
             final RubyFiber currentFiber = getLanguage().getCurrentFiber();
@@ -307,7 +312,7 @@ public abstract class FiberNodes {
                     fiberYieldedTo,
                     FiberOperation.YIELD,
                     RubyArguments.getDescriptor(frame),
-                    rawArgs);
+                    stores.boxedCopyOfRange(store, 0, rawArgs.size));
         }
 
     }
@@ -368,6 +373,36 @@ public abstract class FiberNodes {
         }
     }
 
+    @Primitive(name = "fiber_get_scheduler")
+    public abstract static class GetSchedulerNode extends PrimitiveArrayArgumentsNode {
+
+        @Specialization
+        protected Object get(RubyFiber fiber) {
+            return fiber.rubyThread.scheduler;
+        }
+    }
+
+    @Primitive(name = "fiber_get_block_proc")
+    public abstract static class GetBlockProcNode extends PrimitiveArrayArgumentsNode {
+
+        @Specialization
+        protected Object get() {
+            final RubyFiber fiber = getLanguage().getCurrentThread().getCurrentFiber();
+            return fiber.blockProc;
+        }
+    }
+
+    @Primitive(name = "fiber_get_and_set_block_proc")
+    public abstract static class SetBlockProcNode extends PrimitiveArrayArgumentsNode {
+
+        @Specialization
+        protected Object set(Object blockProc) {
+            final RubyFiber fiber = getLanguage().getCurrentThread().getCurrentFiber();
+            Object oldBlockProc = fiber.blockProc;
+            fiber.blockProc = blockProc;
+            return oldBlockProc;
+        }
+    }
 
     @CoreMethod(names = "blocking?")
     public abstract static class IsBlockingInstanceNode extends CoreMethodArrayArgumentsNode {
@@ -394,4 +429,30 @@ public abstract class FiberNodes {
 
     }
 
+    @Primitive(name = "fiber_scheduler_if_needed")
+    public abstract static class FiberSchedulerIfNeeededNode extends PrimitiveArrayArgumentsNode {
+
+        @Specialization
+        protected Object fiberSchedulerIfNeeded() {
+            if (getLanguage().isFiberScheduling()) {
+                RubyFiber currentFiber = getLanguage().getCurrentThread().getCurrentFiber();
+                if (currentFiber.blocking) {
+                    return nil;
+                } else {
+                    return currentFiber.rubyThread.scheduler;
+                }
+            } else {
+                return nil;
+            }
+        }
+    }
+
+    @Primitive(name = "fiber_scheduling?")
+    public abstract static class FiberSchedulingNode extends PrimitiveArrayArgumentsNode {
+
+        @Specialization
+        protected boolean isFiberScheduling() {
+            return getLanguage().isFiberScheduling();
+        }
+    }
 }

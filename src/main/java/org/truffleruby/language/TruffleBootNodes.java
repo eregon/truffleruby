@@ -28,8 +28,10 @@ import org.truffleruby.builtins.CoreMethodNode;
 import org.truffleruby.builtins.CoreModule;
 import org.truffleruby.core.array.RubyArray;
 import org.truffleruby.core.encoding.Encodings;
+import org.truffleruby.core.fiber.RubyBlocker;
 import org.truffleruby.core.string.RubyString;
 import org.truffleruby.core.symbol.RubySymbol;
+import org.truffleruby.core.thread.RubyThread;
 import org.truffleruby.language.control.RaiseException;
 import org.truffleruby.language.dispatch.DispatchNode;
 import org.truffleruby.language.exceptions.TopLevelRaiseHandler;
@@ -145,7 +147,27 @@ public abstract class TruffleBootNodes {
                             coreLibrary().mainObject,
                             getContext().getRootLexicalScope());
 
-                    deferredCall.call(callNode);
+                    try {
+                        try {
+                            deferredCall.call(callNode);
+                        } finally {
+                            /* Run scheduled fibers if the scheduler has been set. We preform the check in Java so that
+                             * we will not introduce a safepoint where an exception might be raised unless a scheduler
+                             * has been set. This is done to avoid races between raise and kill. */
+                            if (getLanguage().getCurrentThread().scheduler != nil) {
+                                RubyContext.send(this, getContext().getCoreLibrary().fiberClass, "set_scheduler", nil);
+                            }
+                        }
+                    } finally {
+                        RubyThread thread = getLanguage().getCurrentThread();
+                        Object exitBlocker = thread.getAndSetReleaseBlocker(nil);
+                        if (getLanguage().isFiberScheduling() && exitBlocker != nil &&
+                                !((RubyBlocker) exitBlocker).isEmpty()) {
+                            RubyContext.send(this, getContext().getCoreLibrary().truffleFiberOperationsModule,
+                                    "unblock",
+                                    exitBlocker, thread);
+                        }
+                    }
                 }
             });
         }

@@ -24,6 +24,7 @@ import org.truffleruby.RubyContext;
 import org.truffleruby.RubyLanguage;
 import org.truffleruby.core.InterruptMode;
 import org.truffleruby.core.exception.RubyException;
+import org.truffleruby.core.fiber.RubyBlockable;
 import org.truffleruby.core.fiber.RubyFiber;
 import org.truffleruby.core.hash.HashOperations;
 import org.truffleruby.core.hash.RubyHash;
@@ -32,14 +33,12 @@ import org.truffleruby.core.support.PRNGRandomizerNodes;
 import org.truffleruby.core.support.RubyPRNGRandomizer;
 import org.truffleruby.core.tracepoint.TracePointState;
 import org.truffleruby.language.Nil;
-import org.truffleruby.language.RubyDynamicObject;
 import org.truffleruby.language.objects.ObjectGraph;
-import org.truffleruby.language.objects.ObjectGraphNode;
 import org.truffleruby.language.threadlocal.ThreadLocalGlobals;
 
 import com.oracle.truffle.api.object.Shape;
 
-public final class RubyThread extends RubyDynamicObject implements ObjectGraphNode {
+public final class RubyThread extends RubyBlockable {
 
     // Fields initialized here are initialized just after the super() call, and before the rest of the constructor
     public final ThreadLocalGlobals threadLocalGlobals = new ThreadLocalGlobals();
@@ -66,6 +65,7 @@ public final class RubyThread extends RubyDynamicObject implements ObjectGraphNo
     Object threadGroup;
     public String sourceLocation;
     Object name = Nil.INSTANCE;
+    public Object scheduler = Nil.INSTANCE;
 
     // Decimal formats are not thread safe, so we'll create them on the thread as we need them.
 
@@ -134,6 +134,7 @@ public final class RubyThread extends RubyDynamicObject implements ObjectGraphNo
 
     @Override
     public void getAdjacentObjects(Set<Object> reachable) {
+        super.getAdjacentObjects(reachable);
         ObjectGraph.addProperty(reachable, threadLocalVariables);
         ObjectGraph.addProperty(reachable, name);
         // share fibers of a thread as its fiberLocals might be accessed by other threads with Thread#[]

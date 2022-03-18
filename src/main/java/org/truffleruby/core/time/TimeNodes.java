@@ -12,6 +12,7 @@ package org.truffleruby.core.time;
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.dsl.Cached;
+import com.oracle.truffle.api.dsl.Fallback;
 import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.object.Shape;
 import com.oracle.truffle.api.profiles.ConditionProfile;
@@ -23,6 +24,7 @@ import org.truffleruby.builtins.CoreMethodArrayArgumentsNode;
 import org.truffleruby.builtins.CoreModule;
 import org.truffleruby.builtins.Primitive;
 import org.truffleruby.builtins.PrimitiveArrayArgumentsNode;
+import org.truffleruby.core.cast.ToLongNode;
 import org.truffleruby.core.encoding.Encodings;
 import org.truffleruby.core.encoding.RubyEncoding;
 import org.truffleruby.core.exception.ErrnoErrorNode;
@@ -34,8 +36,10 @@ import org.truffleruby.core.string.StringHelperNodes;
 import org.truffleruby.core.string.StringUtils;
 import org.truffleruby.core.time.RubyDateFormatter.Token;
 import org.truffleruby.language.Nil;
+import org.truffleruby.language.NotProvided;
 import org.truffleruby.language.Visibility;
 import org.truffleruby.language.control.RaiseException;
+import org.truffleruby.language.dispatch.DispatchNode;
 import org.truffleruby.language.library.RubyStringLibrary;
 import org.truffleruby.language.objects.AllocationTracing;
 
@@ -44,6 +48,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.util.concurrent.TimeUnit;
 
 @CoreModule(value = "Time", isClass = true)
 public abstract class TimeNodes {
@@ -72,6 +77,47 @@ public abstract class TimeNodes {
             self.relativeOffset = from.relativeOffset;
             self.isUtc = from.isUtc;
             return self;
+        }
+    }
+
+    @Primitive(name = "time_duration_to_nano")
+    public abstract static class DurationToNanosecondsNode extends PrimitiveArrayArgumentsNode {
+
+        private final ConditionProfile durationLessThanZeroProfile = ConditionProfile.create();
+
+        public abstract long execute(Object duration);
+
+        @Specialization
+        protected long noDuration(NotProvided duration) {
+            return Long.MAX_VALUE;
+        }
+
+        @Specialization
+        protected long duration(long duration) {
+            return validate(TimeUnit.SECONDS.toNanos(duration));
+        }
+
+        @Specialization
+        protected long duration(double duration) {
+            return validate((long) (duration * 1e9));
+        }
+
+        @Fallback
+        protected long duration(Object duration,
+                @Cached DispatchNode durationToNanoSeconds,
+                @Cached ToLongNode toLongNode) {
+            final Object nanoseconds = durationToNanoSeconds.call(
+                    coreLibrary().truffleKernelOperationsModule,
+                    "convert_duration_to_nanoseconds",
+                    duration);
+            return validate(toLongNode.execute(nanoseconds));
+        }
+
+        private long validate(long durationInNanos) {
+            if (durationLessThanZeroProfile.profile(durationInNanos < 0)) {
+                throw new RaiseException(getContext(), coreExceptions().argumentErrorTimeIntervalPositive(this));
+            }
+            return durationInNanos;
         }
     }
 

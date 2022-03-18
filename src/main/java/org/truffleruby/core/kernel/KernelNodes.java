@@ -44,7 +44,6 @@ import org.truffleruby.core.binding.RubyBinding;
 import org.truffleruby.core.cast.BooleanCastNode;
 import org.truffleruby.core.cast.BooleanCastNodeGen;
 import org.truffleruby.core.cast.BooleanCastWithDefaultNode;
-import org.truffleruby.core.cast.DurationToNanoSecondsNode;
 import org.truffleruby.core.cast.NameToJavaStringNode;
 import org.truffleruby.core.cast.ToIntNode;
 import org.truffleruby.core.cast.ToStrNode;
@@ -1604,13 +1603,11 @@ public abstract class KernelNodes {
 
     }
 
-    @CoreMethod(names = "sleep", isModuleFunction = true, optional = 1)
-    public abstract static class SleepNode extends CoreMethodArrayArgumentsNode {
+    @Primitive(name = "kernel_sleep")
+    public abstract static class SleepNode extends PrimitiveArrayArgumentsNode {
 
         @Specialization
-        protected long sleep(Object maybeDuration,
-                @Cached DurationToNanoSecondsNode durationToNanoSecondsNode) {
-            long durationInNanos = durationToNanoSecondsNode.execute(maybeDuration);
+        protected long sleep(long durationInNanos) {
             assert durationInNanos >= 0;
 
             final RubyThread thread = getLanguage().getCurrentThread();
