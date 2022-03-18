@@ -9,7 +9,7 @@ Test error in Ruby => C ext support => Ruby
 	from /bin/backtraces:29:in `<main>'
 
 Test with an internal error from rb_mutex_lock()
-/lib/truffle/truffle/cext.rb:n:in `lock': deadlock; recursive locking (ThreadError)
+<internal:core> core/mutex.rb:n:in `lock': deadlock; recursive locking (ThreadError)
 	from /lib/truffle/truffle/cext.rb:n:in `rb_mutex_lock'
 	from /src/main/c/cext/mutex.c:n:in `rb_mutex_lock'
 	from <internal:core> core/truffle/polyglot.rb:n:in `execute'
