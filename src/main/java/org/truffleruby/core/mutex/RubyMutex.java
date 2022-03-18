@@ -11,12 +11,12 @@ package org.truffleruby.core.mutex;
 
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.truffleruby.core.fiber.RubyBlockable;
 import org.truffleruby.core.klass.RubyClass;
-import org.truffleruby.language.RubyDynamicObject;
 
 import com.oracle.truffle.api.object.Shape;
 
-public final class RubyMutex extends RubyDynamicObject {
+public final class RubyMutex extends RubyBlockable {
 
     public final ReentrantLock lock;
 
@@ -24,5 +24,4 @@ public final class RubyMutex extends RubyDynamicObject {
         super(rubyClass, shape);
         this.lock = lock;
     }
-
 }

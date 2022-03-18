@@ -16,14 +16,11 @@ import com.oracle.truffle.api.profiles.ConditionProfile;
 import org.truffleruby.builtins.CoreMethod;
 import org.truffleruby.builtins.CoreMethodArrayArgumentsNode;
 import org.truffleruby.builtins.CoreModule;
+import org.truffleruby.builtins.Primitive;
+import org.truffleruby.builtins.PrimitiveArrayArgumentsNode;
 import org.truffleruby.builtins.UnaryCoreMethodNode;
-import org.truffleruby.builtins.YieldingCoreMethodNode;
-import org.truffleruby.core.cast.DurationToNanoSecondsNode;
-import org.truffleruby.core.kernel.KernelNodes;
 import org.truffleruby.core.klass.RubyClass;
-import org.truffleruby.core.proc.RubyProc;
 import org.truffleruby.core.thread.RubyThread;
-import org.truffleruby.language.NotProvided;
 import org.truffleruby.language.Visibility;
 import org.truffleruby.language.control.RaiseException;
 import org.truffleruby.language.objects.AllocationTracing;
@@ -45,8 +42,8 @@ public abstract class MutexNodes {
         }
     }
 
-    @CoreMethod(names = "lock")
-    public abstract static class LockNode extends UnaryCoreMethodNode {
+    @Primitive(name = "mutex_lock")
+    public abstract static class LockNode extends PrimitiveArrayArgumentsNode {
 
         @Specialization
         protected RubyMutex lock(RubyMutex mutex,
@@ -63,6 +60,22 @@ public abstract class MutexNodes {
             return mutex;
         }
 
+    }
+
+    @Primitive(name = "mutex_check_not_held")
+    public abstract static class CheckNotHeldNode extends PrimitiveArrayArgumentsNode {
+
+        @Specialization
+        protected Object checkNotHeld(RubyMutex mutex,
+                @Cached BranchProfile errorProfile) {
+            final ReentrantLock lock = mutex.lock;
+
+            if (lock.isHeldByCurrentThread()) {
+                errorProfile.enter();
+                throw new RaiseException(getContext(), coreExceptions().threadErrorRecursiveLocking(this));
+            }
+            return mutex;
+        }
     }
 
     @CoreMethod(names = "locked?")
@@ -83,25 +96,19 @@ public abstract class MutexNodes {
         }
     }
 
-    @CoreMethod(names = "try_lock")
-    public abstract static class TryLockNode extends UnaryCoreMethodNode {
+    @Primitive(name = "mutex_try_lock")
+    public abstract static class TryLockNode extends PrimitiveArrayArgumentsNode {
 
         @Specialization
         protected boolean tryLock(RubyMutex mutex,
                 @Cached ConditionProfile heldByCurrentThreadProfile) {
             final ReentrantLock lock = mutex.lock;
-            final RubyThread thread = getLanguage().getCurrentThread();
-
-            if (heldByCurrentThreadProfile.profile(lock.isHeldByCurrentThread())) {
-                return false;
-            } else {
-                return MutexOperations.tryLock(lock, thread);
-            }
+            return MutexOperations.tryLock(lock, getLanguage().getCurrentThread());
         }
     }
 
-    @CoreMethod(names = "unlock")
-    public abstract static class UnlockNode extends UnaryCoreMethodNode {
+    @Primitive(name = "mutex_unlock")
+    public abstract static class UnlockNode extends PrimitiveArrayArgumentsNode {
 
         @Specialization
         protected RubyMutex unlock(RubyMutex mutex,
@@ -115,69 +122,4 @@ public abstract class MutexNodes {
         }
 
     }
-
-    @CoreMethod(names = "synchronize", needsBlock = true)
-    public abstract static class SynchronizeNode extends YieldingCoreMethodNode {
-
-        @Specialization
-        protected Object synchronize(RubyMutex mutex, RubyProc block,
-                @Cached BranchProfile errorProfile) {
-            final ReentrantLock lock = mutex.lock;
-            final RubyThread thread = getLanguage().getCurrentThread();
-
-            if (lock.isHeldByCurrentThread()) {
-                errorProfile.enter();
-                throw new RaiseException(getContext(), coreExceptions().threadErrorRecursiveLocking(this));
-            }
-
-            /* This code uses lock/unlock because the list of owned locks must be maintained. User code can unlock a
-             * mutex inside a synchronize block, and then relock it before exiting the block, and we need the owned
-             * locks list to be in consistent state at the end. */
-            MutexOperations.lock(getContext(), lock, thread, this);
-            try {
-                return callBlock(block);
-            } finally {
-                MutexOperations.checkOwnedMutex(getContext(), lock, this, errorProfile);
-                MutexOperations.unlock(lock, thread);
-            }
-        }
-
-    }
-
-    @CoreMethod(names = "sleep", optional = 1)
-    public abstract static class SleepNode extends CoreMethodArrayArgumentsNode {
-
-        @Specialization
-        protected long sleep(RubyMutex mutex, Object maybeDuration,
-                @Cached DurationToNanoSecondsNode durationToNanoSecondsNode,
-                @Cached ConditionProfile nilProfile,
-                @Cached BranchProfile errorProfile) {
-            if (nilProfile.profile(maybeDuration == nil)) {
-                maybeDuration = NotProvided.INSTANCE;
-            }
-
-            long durationInNanos = durationToNanoSecondsNode.execute(maybeDuration);
-
-            final ReentrantLock lock = mutex.lock;
-            final RubyThread thread = getLanguage().getCurrentThread();
-
-            MutexOperations.checkOwnedMutex(getContext(), lock, this, errorProfile);
-
-            /* Clear the wakeUp flag, following Ruby semantics: it should only be considered if we are inside the sleep
-             * when Thread#{run,wakeup} is called. Here we do it before unlocking for providing nice semantics for
-             * thread1: mutex.sleep thread2: mutex.synchronize { <ensured that thread1 is sleeping and thread1.wakeup
-             * will wake it up> } */
-
-            thread.wakeUp.set(false);
-
-            MutexOperations.unlock(lock, thread);
-            try {
-                return KernelNodes.SleepNode.sleepFor(getContext(), thread, durationInNanos, this);
-            } finally {
-                MutexOperations.lockEvenWithExceptions(getContext(), lock, thread, this);
-            }
-        }
-
-    }
-
 }

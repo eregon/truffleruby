@@ -1037,6 +1037,7 @@ public class CoreLibrary {
             "/core/truffle/process_operations.rb", // Must load after /core/regexp.rb
             "/core/signal.rb",
             "/core/symbol.rb",
+            "/core/truffle/mutex_operations.rb",
             "/core/mutex.rb",
             "/core/throw_catch.rb",
             "/core/time.rb",

@@ -30,4 +30,61 @@ class Mutex
   def marshal_dump
     raise TypeError, "can't dump #{self.class}"
   end
+
+  def lock
+    if Primitive.fiber_current_fiber_scheduling?
+      Truffle::FiberOperations.block_until_true(self, nil) do
+        Primitive.mutex_try_lock(Primitive.mutex_check_not_held(self))
+      end
+    else
+      Primitive.mutex_lock(self)
+    end
+    Primitive.blockable_set_release_blocker(self, Truffle::FiberOperations::EMPTY_BLOCKER)
+    self
+  end
+
+  def try_lock
+    if owned?
+      false
+    else
+      if Primitive.mutex_try_lock(self)
+        Primitive.blockable_set_release_blocker(self, Truffle::FiberOperations::EMPTY_BLOCKER)
+        true
+      else
+        false
+      end
+    end
+  end
+
+  def unlock
+    blocker = Primitive.blockable_get_and_set_acquire_blocker(self, nil)
+    Primitive.mutex_unlock(self)
+    Truffle::FiberOperations.unblock(blocker, self) if Primitive.fiber_scheduling?
+    self
+  end
+
+  def synchronize(&block)
+    lock
+    begin
+      yield
+    ensure
+      unlock
+    end
+  end
+
+  def sleep(duration=nil)
+    interval = Primitive.time_duration_to_nano(duration || undefined)
+    Truffle::MutexOperations.ownership_error(self) unless owned?
+    begin
+      unlock
+      scheduler = Primitive.fiber_scheduler_if_needed
+      if scheduler
+        scheduler.kernel_sleep(duration)
+      else
+        Primitive.kernel_sleep(interval)
+      end
+    ensure
+      lock
+    end
+  end
 end

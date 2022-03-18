@@ -66,6 +66,15 @@ public abstract class BlockableNodes {
         }
     }
 
+    @Primitive(name = "blockable_get_and_set_acquire_blocker")
+    public abstract static class GetAndSetAcquireBlockerNode extends PrimitiveArrayArgumentsNode {
+
+        @Specialization
+        protected Object getAndSetBlocker(RubyBlockable blocker, Object newBlocker) {
+            return blocker.getAndSetAcquireBlocker(newBlocker);
+        }
+    }
+
     @Primitive(name = "blockable_get_and_set_release_blocker")
     public abstract static class GetAndSetReleaseBlockerNode extends PrimitiveArrayArgumentsNode {
 

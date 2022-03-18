@@ -447,6 +447,24 @@ public abstract class FiberNodes {
         }
     }
 
+    @Primitive(name = "fiber_current_fiber_scheduling?")
+    public abstract static class FiberIsSchedulingNode extends PrimitiveArrayArgumentsNode {
+
+        @Specialization
+        protected boolean fiberSchedulerIfNeeded() {
+            if (getLanguage().isFiberScheduling()) {
+                RubyFiber currentFiber = getLanguage().getCurrentThread().getCurrentFiber();
+                if (currentFiber.blocking) {
+                    return false;
+                } else {
+                    return currentFiber.rubyThread.scheduler != nil;
+                }
+            } else {
+                return false;
+            }
+        }
+    }
+
     @Primitive(name = "fiber_scheduling?")
     public abstract static class FiberSchedulingNode extends PrimitiveArrayArgumentsNode {
 
