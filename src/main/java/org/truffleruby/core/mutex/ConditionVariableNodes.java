@@ -54,6 +54,70 @@ public abstract class ConditionVariableNodes {
         }
     }
 
+    @Primitive(name = "condition_variable_try_lock")
+    public abstract static class TryLockNode extends PrimitiveArrayArgumentsNode {
+
+        @Specialization
+        @TruffleBoundary
+        protected boolean tryLock(RubyConditionVariable condVar) {
+            return condVar.lock.tryLock();
+        }
+    }
+
+    @Primitive(name = "condition_variable_unlock")
+    public abstract static class UnlockNode extends PrimitiveArrayArgumentsNode {
+
+        @Specialization
+        @TruffleBoundary
+        protected Object unlock(RubyConditionVariable condVar) {
+            condVar.lock.unlock();
+            return nil;
+        }
+    }
+
+    @Primitive(name = "condition_variable_lock")
+    public abstract static class LockNOde extends PrimitiveArrayArgumentsNode {
+
+        @Specialization
+        protected Object lock(RubyConditionVariable condVar) {
+            MutexOperations.lockInternal(getContext(), condVar.lock, this);
+            return nil;
+        }
+    }
+
+    @Primitive(name = "condition_variable_consume_signal")
+    public abstract static class ConsumeSignalNode extends PrimitiveArrayArgumentsNode {
+
+        @Specialization
+        protected boolean consumeSignal(RubyConditionVariable self) {
+            if (self.signals > 0) {
+                self.signals--;
+                return true;
+            }
+            return false;
+        }
+    }
+
+    @Primitive(name = "condition_variable_wait_non_blocking")
+    public abstract static class WaitNonBlockingNode extends PrimitiveArrayArgumentsNode {
+
+        @Specialization
+        protected Object waitNonBlocking(RubyConditionVariable self) {
+            self.waiters++;
+            return nil;
+        }
+    }
+
+    @Primitive(name = "condition_variable_wait_cancel")
+    public abstract static class WaitCancelNode extends PrimitiveArrayArgumentsNode {
+
+        @Specialization
+        protected Object waitCancel(RubyConditionVariable self) {
+            self.waiters--;
+            return nil;
+        }
+    }
+
     @Primitive(name = "condition_variable_wait")
     public abstract static class WaitNode extends PrimitiveArrayArgumentsNode {
 
@@ -203,23 +267,18 @@ public abstract class ConditionVariableNodes {
 
     }
 
-    @CoreMethod(names = "signal")
-    public abstract static class SignalNode extends CoreMethodArrayArgumentsNode {
+    @Primitive(name = "condition_variable_signal")
+    public abstract static class SignalNode extends PrimitiveArrayArgumentsNode {
 
         @TruffleBoundary
         @Specialization
         protected RubyConditionVariable signal(RubyConditionVariable self) {
-            final ReentrantLock condLock = self.lock;
             final Condition condition = self.condition;
 
-            condLock.lock();
-            try {
-                if (self.waiters > 0) {
-                    self.signals++;
-                    condition.signal();
-                }
-            } finally {
-                condLock.unlock();
+            // The caller must have acquired the lock before calling this primitive.
+            if (self.waiters > 0) {
+                self.signals++;
+                condition.signal();
             }
 
             return self;

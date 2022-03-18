@@ -339,6 +339,12 @@ end
 
 class ConditionVariable
 
+  def initialize
+    Primitive.blockable_set_blocker(self, Truffle::FiberOperations::EMPTY_BLOCKER)
+    @signal_blocker = Truffle::Blockable.new
+    Primitive.blockable_set_blocker(@signal_blocker, Truffle::FiberOperations::EMPTY_BLOCKER)
+  end
+
   def wait(mutex, timeout=nil)
     if timeout
       raise ArgumentError, 'Timeout must be positive' if timeout < 0
@@ -354,7 +360,23 @@ class ConditionVariable
 
     raise ArgumentError, "#{mutex} must be a Mutex or Mutex_m" unless Primitive.object_kind_of?(raw_mutex, Mutex)
 
-    Primitive.condition_variable_wait(self, raw_mutex, timeout)
+    if Primitive.fiber_current_fiber_scheduling?
+      Truffle::ConditionVariableOperations.wait_non_blocking(self, raw_mutex, timeout)
+    else
+      Primitive.condition_variable_wait(self, raw_mutex, timeout)
+    end
+  end
+
+  def signal
+    Truffle::ConditionVariableOperations.lock(self)
+    begin
+      blocker = Primitive.blockable_get_and_set_acquire_blocker(@signal_blocker, Truffle::FiberOperations::EMPTY_BLOCKER)
+      Primitive.condition_variable_signal(self)
+    ensure
+      Primitive.condition_variable_unlock(self)
+      Truffle::FiberOperations.unblock(blocker, @signal_blocker) if Primitive.fiber_scheduling?
+    end
+    self
   end
 
   def marshal_dump

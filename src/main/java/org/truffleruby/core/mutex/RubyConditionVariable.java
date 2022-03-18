@@ -12,12 +12,12 @@ package org.truffleruby.core.mutex;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.truffleruby.core.fiber.RubyBlockable;
 import org.truffleruby.core.klass.RubyClass;
-import org.truffleruby.language.RubyDynamicObject;
 
 import com.oracle.truffle.api.object.Shape;
 
-public final class RubyConditionVariable extends RubyDynamicObject {
+public final class RubyConditionVariable extends RubyBlockable {
 
     final ReentrantLock lock;
     final Condition condition;
