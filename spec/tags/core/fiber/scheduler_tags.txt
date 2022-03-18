@@ -1,0 +1,1 @@
+slow:Fiber.scheduler executes the close method on the main thread when that thread exits
