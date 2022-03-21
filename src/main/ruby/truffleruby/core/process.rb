@@ -588,7 +588,14 @@ module Process
   end
 
   def wait(pid=-1, flags=nil)
-    Truffle::ProcessOperations.wait(pid, flags, true, true)&.pid
+    scheduler = Primitive.fiber_scheduler_if_needed
+    if scheduler && scheduler.respond_to?(:process_wait)
+      status = scheduler.process_wait(pid, flags)
+      Primitive.thread_set_return_code status
+    else
+      status = Truffle::ProcessOperations.wait(pid, flags, true, true)
+    end
+    status&.pid
   end
 
   class << self
@@ -699,7 +706,12 @@ module Process
     end
 
     def self.wait(pid=-1, flags=nil)
-      Truffle::ProcessOperations.wait(pid, flags, false, false)
+      scheduler = Primitive.fiber_scheduler_if_needed
+      if scheduler && scheduler.respond_to?(:process_wait)
+        scheduler.process_wait(pid, flags)
+      else
+        Truffle::ProcessOperations.wait(pid, flags, false, false)
+      end
     end
   end
 
