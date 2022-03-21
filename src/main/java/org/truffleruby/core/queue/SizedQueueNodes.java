@@ -11,19 +11,15 @@ package org.truffleruby.core.queue;
 
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.dsl.Cached;
-import com.oracle.truffle.api.dsl.CreateCast;
-import com.oracle.truffle.api.dsl.NodeChild;
 import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.profiles.BranchProfile;
 import org.truffleruby.builtins.CoreMethod;
 import org.truffleruby.builtins.CoreMethodArrayArgumentsNode;
-import org.truffleruby.builtins.CoreMethodNode;
 import org.truffleruby.builtins.CoreModule;
-import org.truffleruby.core.cast.BooleanCastWithDefaultNode;
+import org.truffleruby.builtins.Primitive;
+import org.truffleruby.builtins.PrimitiveArrayArgumentsNode;
 import org.truffleruby.core.klass.RubyClass;
 import org.truffleruby.core.thread.ThreadManager.BlockingAction;
-import org.truffleruby.language.RubyBaseNodeWithExecute;
-import org.truffleruby.language.RubyNode;
 import org.truffleruby.language.Visibility;
 import org.truffleruby.language.control.RaiseException;
 import org.truffleruby.language.objects.AllocationTracing;
@@ -46,8 +42,8 @@ public abstract class SizedQueueNodes {
 
     }
 
-    @CoreMethod(names = "initialize", visibility = Visibility.PRIVATE, required = 1, lowerFixnum = 1)
-    public abstract static class InitializeNode extends CoreMethodArrayArgumentsNode {
+    @Primitive(name = "sized_queue_initialize", lowerFixnum = 1)
+    public abstract static class InitializeNode extends PrimitiveArrayArgumentsNode {
 
         @Specialization
         protected RubySizedQueue initialize(RubySizedQueue self, int capacity,
@@ -66,7 +62,7 @@ public abstract class SizedQueueNodes {
 
     }
 
-    @CoreMethod(names = "max=", required = 1, lowerFixnum = 1)
+    @Primitive(name = "sized_queue_set_max", lowerFixnum = 1)
     public abstract static class SetMaxNode extends CoreMethodArrayArgumentsNode {
 
         @Specialization
@@ -97,21 +93,13 @@ public abstract class SizedQueueNodes {
 
     }
 
-    @CoreMethod(names = { "push", "<<", "enq" }, required = 1, optional = 1)
-    @NodeChild(value = "queue", type = RubyNode.class)
-    @NodeChild(value = "value", type = RubyNode.class)
-    @NodeChild(value = "nonBlocking", type = RubyBaseNodeWithExecute.class)
-    public abstract static class PushNode extends CoreMethodNode {
+    @Primitive(name = "sized_queue_push_blocking")
+    public abstract static class PushblockingNode extends PrimitiveArrayArgumentsNode {
 
         @Child PropagateSharingNode propagateSharingNode = PropagateSharingNode.create();
 
-        @CreateCast("nonBlocking")
-        protected RubyBaseNodeWithExecute coerceToBoolean(RubyBaseNodeWithExecute nonBlocking) {
-            return BooleanCastWithDefaultNode.create(false, nonBlocking);
-        }
-
-        @Specialization(guards = "!nonBlocking")
-        protected RubySizedQueue pushBlocking(RubySizedQueue self, final Object value, boolean nonBlocking) {
+        @Specialization
+        protected RubySizedQueue pushBlocking(RubySizedQueue self, final Object value) {
             final SizedQueue queue = self.queue;
 
             propagateSharingNode.executePropagate(self, value);
@@ -130,9 +118,15 @@ public abstract class SizedQueueNodes {
                 }
             });
         }
+    }
 
-        @Specialization(guards = "nonBlocking")
-        protected RubySizedQueue pushNonBlock(RubySizedQueue self, final Object value, boolean nonBlocking,
+    @Primitive(name = "sized_queue_push_non_blocking")
+    public abstract static class PushNonBlockingNode extends PrimitiveArrayArgumentsNode {
+
+        @Child PropagateSharingNode propagateSharingNode = PropagateSharingNode.create();
+
+        @Specialization
+        protected Object pushNonBlock(RubySizedQueue self, final Object value, Object fullMarker, Object closedMarker,
                 @Cached BranchProfile errorProfile) {
             final SizedQueue queue = self.queue;
 
@@ -143,10 +137,10 @@ public abstract class SizedQueueNodes {
                     return self;
                 case FULL:
                     errorProfile.enter();
-                    throw new RaiseException(getContext(), coreExceptions().threadErrorQueueFull(this));
+                    return fullMarker;
                 case CLOSED:
                     errorProfile.enter();
-                    throw new RaiseException(getContext(), coreExceptions().closedQueueError(this));
+                    return closedMarker;
             }
 
             return self;
@@ -154,23 +148,18 @@ public abstract class SizedQueueNodes {
 
     }
 
-    @CoreMethod(names = { "pop", "shift", "deq" }, optional = 1)
-    @NodeChild(value = "queue", type = RubyNode.class)
-    @NodeChild(value = "nonBlocking", type = RubyBaseNodeWithExecute.class)
-    public abstract static class PopNode extends CoreMethodNode {
+    @Primitive(name = "sized_queue_pop_blocking")
+    public abstract static class PopBlockNode extends PrimitiveArrayArgumentsNode {
 
-        @CreateCast("nonBlocking")
-        protected RubyBaseNodeWithExecute coerceToBoolean(RubyBaseNodeWithExecute nonBlocking) {
-            return BooleanCastWithDefaultNode.create(false, nonBlocking);
-        }
-
-        @Specialization(guards = "!nonBlocking")
-        protected Object popBlocking(RubySizedQueue self, boolean nonBlocking) {
-            final SizedQueue queue = self.queue;
+        @Specialization
+        protected Object getNonBlocking(RubySizedQueue rubyQueue,
+                @Cached BranchProfile closedProfile) {
+            final SizedQueue queue = rubyQueue.queue;
 
             final Object value = doPop(queue);
 
             if (value == SizedQueue.CLOSED) {
+                closedProfile.enter();
                 return nil;
             } else {
                 return value;
@@ -182,19 +171,18 @@ public abstract class SizedQueueNodes {
             return getContext().getThreadManager().runUntilResult(this, queue::take);
         }
 
-        @Specialization(guards = "nonBlocking")
-        protected Object popNonBlock(RubySizedQueue self, boolean nonBlocking,
-                @Cached BranchProfile errorProfile) {
-            final SizedQueue queue = self.queue;
+    }
+
+    @Primitive(name = "sized_queue_pop_non_blocking")
+    public abstract static class PopNonBlockNode extends PrimitiveArrayArgumentsNode {
+
+        @Specialization
+        protected Object getNonBlocking(RubySizedQueue rubyQueue, Object marker) {
+            final SizedQueue queue = rubyQueue.queue;
 
             final Object value = queue.poll();
 
-            if (value == null) {
-                errorProfile.enter();
-                throw new RaiseException(getContext(), coreExceptions().threadError("queue empty", this));
-            }
-
-            return value;
+            return value == null ? marker : value;
         }
 
     }
@@ -244,8 +232,8 @@ public abstract class SizedQueueNodes {
 
     }
 
-    @CoreMethod(names = "close")
-    public abstract static class CloseNode extends CoreMethodArrayArgumentsNode {
+    @Primitive(name = "sized_queue_close")
+    public abstract static class CloseNode extends PrimitiveArrayArgumentsNode {
 
         @Specialization
         protected RubySizedQueue close(RubySizedQueue self) {

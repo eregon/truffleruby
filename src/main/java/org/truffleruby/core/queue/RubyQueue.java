@@ -10,14 +10,13 @@
 package org.truffleruby.core.queue;
 
 import com.oracle.truffle.api.object.Shape;
+import org.truffleruby.core.fiber.RubyBlockable;
 import org.truffleruby.core.klass.RubyClass;
-import org.truffleruby.language.RubyDynamicObject;
 import org.truffleruby.language.objects.ObjectGraph;
-import org.truffleruby.language.objects.ObjectGraphNode;
 
 import java.util.Set;
 
-public class RubyQueue extends RubyDynamicObject implements ObjectGraphNode {
+public class RubyQueue extends RubyBlockable {
 
     public final UnsizedQueue queue;
 
@@ -28,6 +27,7 @@ public class RubyQueue extends RubyDynamicObject implements ObjectGraphNode {
 
     @Override
     public void getAdjacentObjects(Set<Object> reachable) {
+        super.getAdjacentObjects(reachable);
         for (Object element : queue.getContents()) {
             if (ObjectGraph.isRubyObject(element)) {
                 reachable.add(element);

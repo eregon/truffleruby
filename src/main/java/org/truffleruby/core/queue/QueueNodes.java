@@ -11,13 +11,11 @@ package org.truffleruby.core.queue;
 
 import org.truffleruby.builtins.CoreMethod;
 import org.truffleruby.builtins.CoreMethodArrayArgumentsNode;
-import org.truffleruby.builtins.CoreMethodNode;
 import org.truffleruby.builtins.CoreModule;
 import org.truffleruby.builtins.NonStandard;
-import org.truffleruby.core.cast.BooleanCastWithDefaultNode;
+import org.truffleruby.builtins.Primitive;
+import org.truffleruby.builtins.PrimitiveArrayArgumentsNode;
 import org.truffleruby.core.klass.RubyClass;
-import org.truffleruby.language.RubyBaseNodeWithExecute;
-import org.truffleruby.language.RubyNode;
 import org.truffleruby.language.Visibility;
 import org.truffleruby.language.control.RaiseException;
 import org.truffleruby.language.objects.AllocationTracing;
@@ -25,8 +23,6 @@ import org.truffleruby.language.objects.shared.PropagateSharingNode;
 
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.dsl.Cached;
-import com.oracle.truffle.api.dsl.CreateCast;
-import com.oracle.truffle.api.dsl.NodeChild;
 import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.profiles.BranchProfile;
 
@@ -45,8 +41,8 @@ public abstract class QueueNodes {
 
     }
 
-    @CoreMethod(names = { "push", "<<", "enq" }, required = 1)
-    public abstract static class PushNode extends CoreMethodArrayArgumentsNode {
+    @Primitive(name = "queue_push")
+    public abstract static class PushNode extends PrimitiveArrayArgumentsNode {
 
         @Child private PropagateSharingNode propagateSharingNode = PropagateSharingNode.create();
 
@@ -65,20 +61,13 @@ public abstract class QueueNodes {
 
     }
 
-    @CoreMethod(names = { "pop", "shift", "deq" }, optional = 1)
-    @NodeChild(value = "queue", type = RubyNode.class)
-    @NodeChild(value = "nonBlocking", type = RubyBaseNodeWithExecute.class)
-    public abstract static class PopNode extends CoreMethodNode {
+    @Primitive(name = "queue_pop_blocking")
+    public abstract static class PopBlockNode extends PrimitiveArrayArgumentsNode {
 
-        @CreateCast("nonBlocking")
-        protected RubyBaseNodeWithExecute coerceToBoolean(RubyBaseNodeWithExecute nonBlocking) {
-            return BooleanCastWithDefaultNode.create(false, nonBlocking);
-        }
-
-        @Specialization(guards = "!nonBlocking")
-        protected Object popBlocking(RubyQueue self, boolean nonBlocking,
+        @Specialization
+        protected Object getNonBlocking(RubyQueue rubyQueue,
                 @Cached BranchProfile closedProfile) {
-            final UnsizedQueue queue = self.queue;
+            final UnsizedQueue queue = rubyQueue.queue;
 
             final Object value = doPop(queue);
 
@@ -95,19 +84,18 @@ public abstract class QueueNodes {
             return getContext().getThreadManager().runUntilResult(this, queue::take);
         }
 
-        @Specialization(guards = "nonBlocking")
-        protected Object popNonBlock(RubyQueue self, boolean nonBlocking,
-                @Cached BranchProfile errorProfile) {
-            final UnsizedQueue queue = self.queue;
+    }
+
+    @Primitive(name = "queue_pop_non_blocking")
+    public abstract static class PopNonBlockNode extends PrimitiveArrayArgumentsNode {
+
+        @Specialization
+        protected Object getNonBlocking(RubyQueue rubyQueue, Object marker) {
+            final UnsizedQueue queue = rubyQueue.queue;
 
             final Object value = queue.poll();
 
-            if (value == null) {
-                errorProfile.enter();
-                throw new RaiseException(getContext(), coreExceptions().threadError("queue empty", this));
-            } else {
-                return value;
-            }
+            return value == null ? marker : value;
         }
 
     }
@@ -210,8 +198,8 @@ public abstract class QueueNodes {
 
     }
 
-    @CoreMethod(names = "close")
-    public abstract static class CloseNode extends CoreMethodArrayArgumentsNode {
+    @Primitive(name = "queue_close")
+    public abstract static class CloseNode extends PrimitiveArrayArgumentsNode {
 
         @Specialization
         protected RubyQueue close(RubyQueue self) {
