@@ -466,20 +466,14 @@ public abstract class ThreadNodes {
         }
     }
 
-    @CoreMethod(names = "join", optional = 1, lowerFixnum = 1)
+    @Primitive(name = "thread_join", lowerFixnum = 2)
     public abstract static class JoinNode extends CoreMethodArrayArgumentsNode {
 
         @TruffleBoundary
         @Specialization
-        protected RubyThread join(RubyThread thread, NotProvided timeout) {
+        protected RubyThread join(RubyThread thread, Nil timeout) {
             doJoin(getContext(), this, thread);
             return thread;
-        }
-
-        @TruffleBoundary
-        @Specialization
-        protected RubyThread join(RubyThread thread, Nil timeout) {
-            return join(thread, NotProvided.INSTANCE);
         }
 
         @TruffleBoundary
@@ -617,12 +611,11 @@ public abstract class ThreadNodes {
 
     }
 
-    @CoreMethod(names = "value")
-    public abstract static class ValueNode extends CoreMethodArrayArgumentsNode {
+    @Primitive(name = "thread_value")
+    public abstract static class ValueNode extends PrimitiveArrayArgumentsNode {
 
         @Specialization
         protected Object value(RubyThread self) {
-            JoinNode.doJoin(getContext(), this, self);
             final Object value = self.value;
             assert value != null;
             return value;

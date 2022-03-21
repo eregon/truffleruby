@@ -294,6 +294,21 @@ class Thread
     omit, length = Truffle::KernelOperations.normalize_backtrace_args(omit, length)
     Primitive.thread_backtrace_locations(self, omit, length)
   end
+
+  def join(limit=nil)
+    if Primitive.fiber_current_fiber_scheduling?
+      Truffle::FiberOperations.block_until_true(self, limit) do
+        !self.alive?
+      end
+    else
+      Primitive.thread_join(self, limit)
+    end
+  end
+
+  def value
+    join
+    Primitive.thread_value(self)
+  end
 end
 
 class ThreadGroup
