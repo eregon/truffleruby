@@ -30,11 +30,9 @@ import org.truffleruby.core.array.ArrayOperations;
 import org.truffleruby.core.array.ArrayUtils;
 import org.truffleruby.core.array.RubyArray;
 import org.truffleruby.core.encoding.EncodingManager;
-import org.truffleruby.core.fiber.RubyFiber;
 import org.truffleruby.core.module.RubyModule;
 import org.truffleruby.core.string.RubyString;
 import org.truffleruby.core.string.StringOperations;
-import org.truffleruby.core.support.IONodes.IOFiberBufferAllocateNode;
 import org.truffleruby.extra.TruffleRubyNodes;
 import org.truffleruby.extra.ffi.Pointer;
 import org.truffleruby.interop.InteropNodes;
@@ -56,7 +54,6 @@ import com.oracle.truffle.api.TruffleFile;
 import com.oracle.truffle.api.interop.InteropException;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.nodes.Node;
-import com.oracle.truffle.api.profiles.ConditionProfile;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
 
@@ -204,9 +201,7 @@ public class FeatureLoader {
             return context.getEnv().getCurrentWorkingDirectory().getPath();
         }
         final int bufferSize = PATH_MAX;
-        final RubyFiber rubyFiber = language.getCurrentThread().getCurrentFiber();
-        final Pointer buffer = IOFiberBufferAllocateNode
-                .getBuffer(rubyFiber, bufferSize, ConditionProfile.getUncached());
+        final Pointer buffer = language.getBuffer(bufferSize);
         try {
             final long address;
             try {
@@ -224,7 +219,7 @@ public class FeatureLoader {
             final Encoding localeEncoding = context.getEncodingManager().getLocaleEncoding().jcoding;
             return new String(bytes, EncodingManager.charsetForEncoding(localeEncoding));
         } finally {
-            rubyFiber.ioBuffer.free(rubyFiber, buffer, ConditionProfile.getUncached());
+            language.releaseBuffer(buffer);
         }
     }
 

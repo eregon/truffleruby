@@ -134,7 +134,7 @@ public class FiberManager {
             final RuntimeException exception = ThreadManager.printInternalError(e);
             lastMessage = new FiberExceptionMessage(exception);
         } finally {
-            fiber.ioBuffer.freeAll(fiber);
+            fiber.ioBuffer.freeAll(language, fiber);
 
             final RubyFiber returnFiber = lastMessage == null ? null : getReturnFiber(fiber, currentNode, UNPROFILED);
 

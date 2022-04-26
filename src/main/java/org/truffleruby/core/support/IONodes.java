@@ -520,8 +520,8 @@ public abstract class IONodes {
             return instance;
         }
 
-        public static Pointer getBuffer(RubyFiber fiber, long size, ConditionProfile sizeProfile) {
-            return fiber.ioBuffer.allocate(fiber, size, sizeProfile);
+        public Pointer getBuffer(RubyFiber fiber, long size, ConditionProfile sizeProfile) {
+            return fiber.ioBuffer.allocate(getLanguage(), fiber, size, sizeProfile);
         }
     }
 
@@ -532,7 +532,7 @@ public abstract class IONodes {
         protected Object getThreadBuffer(RubyPointer pointer,
                 @Cached ConditionProfile freeProfile) {
             RubyFiber fiber = getLanguage().getCurrentThread().getCurrentFiber();
-            fiber.ioBuffer.free(fiber, pointer.pointer, freeProfile);
+            fiber.ioBuffer.free(getLanguage(), fiber, pointer.pointer, freeProfile);
             return nil;
         }
     }

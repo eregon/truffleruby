@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 
@@ -94,6 +95,7 @@ import org.truffleruby.core.time.RubyTime;
 import org.truffleruby.core.tracepoint.RubyTracePoint;
 import org.truffleruby.extra.RubyAtomicReference;
 import org.truffleruby.extra.RubyConcurrentMap;
+import org.truffleruby.extra.ffi.Pointer;
 import org.truffleruby.extra.ffi.RubyPointer;
 import org.truffleruby.core.string.ImmutableRubyString;
 import org.truffleruby.interop.RubyInnerContext;
@@ -266,6 +268,8 @@ public final class RubyLanguage extends TruffleLanguage<RubyContext> {
     private final AtomicLong nextObjectID = new AtomicLong(ObjectSpaceManager.INITIAL_LANGUAGE_OBJECT_ID);
     private final PathToTStringCache pathToTStringCache = new PathToTStringCache(this);
 
+    private final LinkedBlockingDeque<Pointer> buffers = new LinkedBlockingDeque<>();
+
     public final SharedIndicesMap globalVariablesMap = new SharedIndicesMap();
     private final LanguageArray<Assumption> globalVariableNeverAliasedAssumptions = new LanguageArray<>(
             globalVariablesMap,
@@ -363,6 +367,7 @@ public final class RubyLanguage extends TruffleLanguage<RubyContext> {
         symbolTable = new SymbolTable(tstringCache, coreSymbols);
         regexpTable = new RegexpTable();
         frozenStringLiterals = new FrozenStringLiterals(tstringCache);
+        cleaner.register(this, bufferCleaner(buffers));
     }
 
     public RubyThread getCurrentThread() {
@@ -900,5 +905,34 @@ public final class RubyLanguage extends TruffleLanguage<RubyContext> {
     @SuppressWarnings("deprecation") // deprecated on JDK19 by Thread#threadId, but that's added in JDK19
     public static long getThreadId(Thread thread) {
         return thread.getId();
+    }
+
+    @TruffleBoundary
+    public Pointer getBuffer(long size) {
+        Pointer buffer = buffers.pollFirst();
+        if (buffer == null) {
+            buffer = Pointer.malloc(size);
+        } else if (buffer.getSize() < size) {
+            buffer.freeNoAutorelease();
+            buffer = Pointer.malloc(size);
+        }
+        return buffer;
+    }
+
+    @TruffleBoundary
+    public void releaseBuffer(Pointer buffer) {
+        if (!buffers.offerFirst(buffer)) {
+            buffer.freeNoAutorelease();
+        }
+    }
+
+    private static Runnable bufferCleaner(LinkedBlockingDeque<Pointer> buffers) {
+        return () -> {
+            Pointer buffer = buffers.pollFirst();
+            while (buffer != null) {
+                buffer.freeNoAutorelease();
+                buffer = buffers.pollFirst();
+            }
+        };
     }
 }

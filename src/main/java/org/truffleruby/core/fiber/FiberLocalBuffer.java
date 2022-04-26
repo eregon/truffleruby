@@ -9,9 +9,9 @@
  */
 package org.truffleruby.core.fiber;
 
-import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.profiles.ConditionProfile;
 
+import org.truffleruby.RubyLanguage;
 import org.truffleruby.extra.ffi.Pointer;
 
 public final class FiberLocalBuffer {
@@ -43,32 +43,34 @@ public final class FiberLocalBuffer {
         return start.getEndAddress() - remaining;
     }
 
-    private void freeMemory() {
+    private void freeMemory(RubyLanguage language) {
         remaining = 0;
-        start.freeNoAutorelease();
+        if (!start.isNull()) {
+            language.releaseBuffer(start);
+        }
     }
 
-    public void free(RubyFiber fiber, Pointer ptr, ConditionProfile freeProfile) {
+    public void free(RubyLanguage language, RubyFiber fiber, Pointer ptr, ConditionProfile freeProfile) {
         assert ptr.getEndAddress() == cursor() : "free(" + Long.toHexString(ptr.getEndAddress()) +
                 ") but expected " + Long.toHexString(cursor()) + " to be free'd first";
         remaining += ptr.getSize();
         assert invariants();
-        if (freeProfile.profile(parent != null && isEmpty())) {
+        if (isEmpty() && parent != null) {
             fiber.ioBuffer = parent;
-            freeMemory();
+            freeMemory(language);
         }
     }
 
-    public void freeAll(RubyFiber fiber) {
+    public void freeAll(RubyLanguage language, RubyFiber fiber) {
         FiberLocalBuffer current = this;
         fiber.ioBuffer = NULL_BUFFER;
         while (current != null) {
-            current.freeMemory();
+            current.freeMemory(language);
             current = current.parent;
         }
     }
 
-    public Pointer allocate(RubyFiber fiber, long size, ConditionProfile allocationProfile) {
+    public Pointer allocate(RubyLanguage language, RubyFiber fiber, long size, ConditionProfile allocationProfile) {
         /* If there is space in the thread's existing buffer then we will return a pointer to that and reduce the
          * remaining space count. Otherwise we will either allocate a new buffer, or (if no space is currently being
          * used in the existing buffer) replace it with a larger one. */
@@ -82,7 +84,7 @@ public final class FiberLocalBuffer {
             assert invariants();
             return pointer;
         } else {
-            final FiberLocalBuffer newBuffer = allocateNewBlock(fiber, allocationSize);
+            final FiberLocalBuffer newBuffer = allocateNewBlock(language, fiber, allocationSize);
             final Pointer pointer = new Pointer(newBuffer.start.getAddress(), allocationSize);
             newBuffer.remaining -= allocationSize;
             assert newBuffer.invariants();
@@ -94,16 +96,15 @@ public final class FiberLocalBuffer {
         return (size + ALIGNMENT_MASK) & ~ALIGNMENT_MASK;
     }
 
-    @TruffleBoundary
-    private FiberLocalBuffer allocateNewBlock(RubyFiber fiber, long size) {
+    private FiberLocalBuffer allocateNewBlock(RubyLanguage language, RubyFiber fiber, long size) {
         // Allocate a new buffer. Chain it if we aren't the default thread buffer, otherwise make a new default buffer.
         final long blockSize = Math.max(size, 1024);
         final FiberLocalBuffer newBuffer;
-        if (this.parent == null && this.isEmpty()) {
+        if (this.parent != null && this.isEmpty()) {
             // Free the old block
-            freeMemory();
+            freeMemory(language);
             // Create new bigger block
-            newBuffer = new FiberLocalBuffer(Pointer.malloc(blockSize), null);
+            newBuffer = new FiberLocalBuffer(Pointer.malloc(blockSize), this.parent);
         } else {
             newBuffer = new FiberLocalBuffer(Pointer.malloc(blockSize), this);
         }
