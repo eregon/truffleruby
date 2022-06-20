@@ -443,17 +443,15 @@ public abstract class ThreadNodes {
                     sharingReason,
                     () -> {
                         try {
-                            try {
-                                return ProcOperations.rootCall(block, descriptor, args);
-                            } finally {
-                                /* Run scheduled fibers if the scheduler has been set. We preform the check in Java so
-                                 * that we will not introduce a safepoint where an exception might be raised unless a
-                                 * scheduler has been set. This is done to avoid races between raise and kill. */
-                                if (thread.scheduler != nil) {
-                                    RubyContext.send(this, getContext().getCoreLibrary().fiberClass, "set_scheduler",
-                                            nil);
-                                }
+                            var result = ProcOperations.rootCall(block, descriptor, args);
+                            /* Run scheduled fibers if the scheduler has been set. We preform the check in Java so that
+                             * we will not introduce a safepoint where an exception might be raised unless a scheduler
+                             * has been set. This is done to avoid races between raise and kill. */
+                            if (thread.scheduler != nil) {
+                                RubyContext.send(this, getContext().getCoreLibrary().fiberClass, "set_scheduler",
+                                        nil);
                             }
+                            return result;
                         } finally {
                             Object exitBlocker = thread.getAndSetReleaseBlocker(nil);
                             if (getLanguage().isFiberScheduling() && exitBlocker != nil &&
