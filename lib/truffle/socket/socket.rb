@@ -317,6 +317,7 @@ class Socket < BasicSocket
     Errno.handle('socket(2)') if descriptor < 0
 
     IO.setup(self, descriptor, nil, true)
+    self.nonblock = true
     binmode
   end
 
@@ -337,9 +338,10 @@ class Socket < BasicSocket
       sockaddr = sockaddr.to_sockaddr
     end
 
-    status = Truffle::Socket::Foreign.connect(Primitive.io_fd(self), sockaddr)
-
-    Truffle::Socket::Error.connect_error('connect(2)', self) if status < 0
+    while (Truffle::Socket::Foreign.connect(Primitive.io_fd(self), sockaddr)) < 0
+      Truffle::Socket::Error.connect_error('connect(2)', self) if Errno.errno != Errno::EINPROGRESS::Errno
+      self.wait_writable
+    end
 
     0
   end
@@ -393,12 +395,12 @@ class Socket < BasicSocket
   end
 
   def accept
-    Truffle::Socket.accept_and_addrinfo(self, Socket, true)
+    Truffle::Socket.accept_and_addrinfo(self, Socket, true, true)
   end
 
   private def __accept_nonblock(exception)
     self.nonblock = true
-    Truffle::Socket.accept_and_addrinfo(self, Socket, exception)
+    Truffle::Socket.accept_and_addrinfo(self, Socket, exception, false)
   end
 
   def sysaccept

@@ -26,6 +26,8 @@
 # NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+require 'io/wait'
+
 module Truffle
   module Socket
     def self.bsd_support?
@@ -93,30 +95,14 @@ module Truffle
       end
     end
 
-    def self.accept_and_addrinfo(source, new_class, exception)
-      raise IOError, 'socket has been closed' if source.closed?
+    def self.accept_and_addrinfo(source, new_class, exception, blocking)
 
       sockaddr = sockaddr_class_for_socket(source).new
 
       begin
-        fd = Truffle::Socket::Foreign.memory_pointer(:int) do |size_p|
-          size_p.write_int(sockaddr.size)
+        socket = accept(source, new_class, exception, blocking, sockaddr)
 
-          Truffle::Socket::Foreign.accept(source.fileno, sockaddr.pointer, size_p)
-        end
-
-        if fd < 0
-          if !exception and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
-            return :wait_readable
-          else
-            Error.read_error('accept(2)', source)
-          end
-        end
-
-        socket = new_class.for_fd(fd)
-
-        socket.nonblock = true
-        socket.close_on_exec = true
+        return socket if :wait_readable == socket
 
         socktype = source.getsockopt(:SOCKET, :TYPE).int
         addrinfo = Addrinfo.new(sockaddr.to_s, sockaddr.family, socktype)
@@ -127,24 +113,40 @@ module Truffle
       end
     end
 
-    def self.accept(source, new_class, exception)
+    def self.accept(source, new_class, exception, blocking, sockaddr = nil)
       raise IOError, 'socket has been closed' if source.closed?
 
-      fd = Truffle::Socket::Foreign.accept(source.fileno, ::FFI::Pointer::NULL, ::FFI::Pointer::NULL)
-      if fd < 0
-        if !exception and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
-          return :wait_readable
+      do_retry = true
+      while do_retry
+        fd = if sockaddr
+               Truffle::Socket::Foreign.memory_pointer(:int) do |size_p|
+                 size_p.write_int(sockaddr.size)
+
+                 Truffle::Socket::Foreign.accept(source.fileno, sockaddr.pointer, size_p)
+               end
+             else
+               Truffle::Socket::Foreign.accept(source.fileno, ::FFI::Pointer::NULL, ::FFI::Pointer::NULL)
+             end
+        if fd < 0
+          if Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
+            if blocking
+              do_retry = source.wait_readable
+            else
+              raise IO::EAGAINWaitReadable if exception
+              return :wait_readable
+            end
+          else
+            Error.read_error('accept(2)', source)
+          end
         else
-          Error.read_error('accept(2)', source)
+          socket = new_class.for_fd(fd)
+
+          socket.nonblock = true
+          socket.close_on_exec = true
+
+          return socket
         end
       end
-
-      socket = new_class.for_fd(fd)
-
-      socket.nonblock = true
-      socket.close_on_exec = true
-
-      socket
     end
 
     def self.listen(source, backlog)

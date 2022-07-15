@@ -41,6 +41,8 @@ class TCPServer < TCPSocket
       # Truffle: set REUSEADDR *before* bind
       IO.setup(self, descriptor, nil, true)
       binmode
+      self.nonblock = true
+      self.close_on_exec = true
       setsockopt(:SOCKET, :REUSEADDR, true)
 
       status = Truffle::Socket::Foreign
@@ -63,12 +65,12 @@ class TCPServer < TCPSocket
   end
 
   def accept
-    Truffle::Socket.accept(self, TCPSocket, true)
+    Truffle::Socket.accept(self, TCPSocket, true, true)
   end
 
   private def __accept_nonblock(exception)
     self.nonblock = true
-    Truffle::Socket.accept(self, TCPSocket, exception)
+    Truffle::Socket.accept(self, TCPSocket, exception, false)
   end
 
   def sysaccept
