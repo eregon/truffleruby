@@ -36,8 +36,30 @@ class IO
     end
   end
 
-  def wait(timeout = nil, *args)
-    events = Truffle::IOOperations.wait_event_mask(args)
+  def wait(*args)
+    if args.size != 2 || Primitive.object_kind_of?(args[0], Symbol) || Primitive.object_kind_of?(args[1], Symbol)
+      timeout = :undef
+      events = 0
+      args.each do |arg|
+        if Primitive.object_kind_of?(arg, Symbol)
+          events |= Truffle::IOOperations.wait_event_mask([arg])
+        elsif timeout == :undef
+          timeout = arg
+        else
+          raise ArgumentError, 'timeout given more than once'
+        end
+      end
+
+      if timeout == :undef
+        timeout = nil
+      end
+    else
+      events = args[0]
+      timeout = args[1]
+    end
+
+    events = IO::READABLE if events == 0
+
     return wait_readable(timeout) if events == IO::READABLE
 
     scheduler = Fiber.scheduler
