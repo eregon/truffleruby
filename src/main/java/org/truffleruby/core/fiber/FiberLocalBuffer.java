@@ -51,9 +51,11 @@ public final class FiberLocalBuffer {
     }
 
     public void free(RubyLanguage language, RubyFiber fiber, Pointer ptr, ConditionProfile freeProfile) {
-        assert ptr.getEndAddress() == cursor() : "free(" + Long.toHexString(ptr.getEndAddress()) +
+        long size = alignUp(ptr.getSize());
+        assert ptr.getAddress() + size == cursor() : "free(" + Long.toHexString(ptr.getAddress()) +
+                ", length " + Long.toHexString(size) +
                 ") but expected " + Long.toHexString(cursor()) + " to be free'd first";
-        remaining += ptr.getSize();
+        remaining += size;
         assert invariants();
         if (isEmpty() && parent != null) {
             fiber.ioBuffer = parent;
