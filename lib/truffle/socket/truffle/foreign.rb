@@ -120,8 +120,7 @@ module Truffle
       end
 
       def self.getsockopt(descriptor, level, optname)
-        buffer, val, length = Truffle::FFI::Pool.stack_alloc(256, Primitive.pointer_find_type_size(:socklen_t))
-        begin
+        Truffle::FFI::Pool.stack_use(256, Primitive.pointer_find_type_size(:socklen_t)) do |val, length|
           length.write_int(256)
 
           err = _getsockopt(descriptor, level, optname, val, length)
@@ -129,8 +128,6 @@ module Truffle
           Errno.handle('Unable to get socket option') unless err == 0
 
           val.read_string(length.read_int)
-        ensure
-          Truffle::FFI::Pool.stack_free(buffer)
         end
       end
 
@@ -197,9 +194,7 @@ module Truffle
                            reverse_lookup = !BasicSocket.do_not_reverse_lookup)
         name_info = []
 
-        buffer, sockaddr_p, node, service = Truffle::FFI::Pool.stack_alloc(
-          sockaddr.bytesize, ::Socket::NI_MAXHOST, ::Socket::NI_MAXSERV)
-        begin
+        Truffle::FFI::Pool.stack_use(sockaddr.bytesize, ::Socket::NI_MAXHOST, ::Socket::NI_MAXSERV) do |sockaddr_p, node, service|
           sockaddr_p.write_bytes(sockaddr)
 
           if reverse_lookup
@@ -224,36 +219,28 @@ module Truffle
           name_info[2] = name_info[3] unless name_info[2]
 
           name_info
-        ensure
-          Truffle::FFI::Pool.stack_free(buffer)
         end
       end
 
       def self.getpeername(socket)
-        buffer, sockaddr_storage_p, len_p = Truffle::FFI::Pool.stack_alloc(128, Primitive.pointer_find_type_size(:socklen_t))
-        begin
+        Truffle::FFI::Pool.stack_use(128, Primitive.pointer_find_type_size(:socklen_t)) do |sockaddr_storage_p, len_p|
           len_p.write_int(128)
           err = _getpeername(socket.fileno, sockaddr_storage_p, len_p)
 
           Errno.handle('getpeername(2)') unless err == 0
 
           sockaddr_storage_p.read_string(len_p.read_int)
-        ensure
-          Truffle::FFI::Pool.stack_free(buffer)
         end
       end
 
       def self.getsockname(socket)
-        buffer, sockaddr_storage_p, len_p = Truffle::FFI::Pool.stack_alloc(128, Primitive.pointer_find_type_size(:socklen_t))
-        begin
+        Truffle::FFI::Pool.stack_use(128, Primitive.pointer_find_type_size(:socklen_t)) do |sockaddr_storage_p, len_p|
           len_p.write_int(128)
           err = _getsockname(socket.fileno, sockaddr_storage_p, len_p)
 
           Errno.handle('getsockname(2)') unless err == 0
 
           sockaddr_storage_p.read_string(len_p.read_int)
-        ensure
-          Truffle::FFI::Pool.stack_free(buffer)
         end
       end
 

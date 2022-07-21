@@ -332,14 +332,11 @@ module Truffle::POSIX
 
   def self.with_array_of_strings_pointer(strings)
     Truffle::FFI::MemoryPointer.new(:pointer, strings.size + 1) do |ptr|
-      buffer, *pointers = Truffle::FFI::Pool.stack_alloc(*strings.map { |s| s.bytesize + 1 })
-      begin
+      Truffle::FFI::Pool.stack_use(*strings.map { |s| s.bytesize + 1 }) do |*pointers|
         pointers.zip(strings) { |sp, s| sp.put_string(0, s) }
         pointers << Truffle::FFI::Pointer::NULL
         ptr.write_array_of_pointer pointers
         yield(ptr)
-      ensure
-        Truffle::FFI::Pool.stack_free(buffer)
       end
     end
   end
