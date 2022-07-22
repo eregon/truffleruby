@@ -105,6 +105,8 @@ class Addrinfo
       # When using AF_INET6 the protocol family can only be PF_INET6
       if @afamily == Socket::AF_INET6 and !pfamily
         pfamily = Socket::PF_INET6
+      elsif @afamily == Socket::AF_INET and !pfamily
+        pfamily = Socket::PF_INET
       end
     else
       @afamily = Truffle::Socket::Foreign::Sockaddr.family_of_string(sockaddr)

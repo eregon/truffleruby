@@ -40,12 +40,20 @@ class BasicSocket < IO
   end
 
   def self.do_not_reverse_lookup=(setting)
-    @no_reverse_lookup = setting
+    if self == BasicSocket
+      @no_reverse_lookup = setting
+    else
+      BasicSocket.do_not_reverse_lookup = setting
+    end
   end
 
   def self.do_not_reverse_lookup
-    @no_reverse_lookup = true unless defined?(@no_reverse_lookup)
-    @no_reverse_lookup
+    if self == BasicSocket
+      @no_reverse_lookup = true unless defined?(@no_reverse_lookup)
+      @no_reverse_lookup
+    else
+      BasicSocket.do_not_reverse_lookup
+    end
   end
 
   def do_not_reverse_lookup=(setting)
@@ -174,9 +182,13 @@ class BasicSocket < IO
   end
 
   private def __recv_nonblock(bytes_to_read, flags, buf, exception)
-    self.nonblock = true
-
-    internal_recv(bytes_to_read, flags, buf, exception, true)
+    old_value = self.nonblock?
+    begin
+      self.nonblock = true unless old_value
+      internal_recv(bytes_to_read, flags, buf, exception, true)
+    ensure
+      self.nonblock = false unless old_value
+    end
   end
 
   private def internal_recvmsg(max_msg_len, flags, max_control_len, scm_rights, exception, nonblock = false)
@@ -247,8 +259,9 @@ class BasicSocket < IO
   end
 
   private def __recvmsg_nonblock(max_msg_len, flags, max_control_len, scm_rights, exception)
-    self.nonblock = true
-
+    # We don't need to set the socket to be non-blocking here because
+    # we're using the DONTWAIT flag which the recvmsg call should
+    # respect..
     internal_recvmsg(max_msg_len, flags | Socket::MSG_DONTWAIT, max_control_len, scm_rights, exception, true)
   end
 
@@ -283,7 +296,7 @@ class BasicSocket < IO
         elsif !exception and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
           return :wait_writable
         else
-          Truffle::Socket::Error.read_error('sendmsg(2)', self)
+          Truffle::Socket::Error.write_error('sendmsg(2)', self)
         end
       end
 

@@ -1804,8 +1804,6 @@ class IO
   def read_nonblock(size, buffer = nil, exception: true)
     raise ArgumentError, 'illegal read size' if size < 0
     ensure_open_and_readable
-    self.nonblock = true
-
     buffer = StringValue buffer if buffer
 
     return ''.b if size == 0
@@ -1814,7 +1812,13 @@ class IO
       return @ibuffer.shift(size)
     end
 
-    str = Truffle::POSIX.read_string_nonblock(self, size, exception)
+    old_value = self.nonblock?
+    str = begin
+            self.nonblock = true unless old_value
+            Truffle::POSIX.read_string_nonblock(self, size, exception)
+          ensure
+            self.nonblock = false unless old_value
+          end
 
     case str
     when Symbol
@@ -2390,10 +2394,14 @@ class IO
 
     reset_buffering unless @mode & FMODE_SYNC != 0
 
-    self.nonblock = true
-
     begin
-      Truffle::POSIX.write_string_nonblock(self, data)
+      old_value = self.nonblock?
+      begin
+        self.nonblock = true unless old_value
+        Truffle::POSIX.write_string_nonblock(self, data)
+      ensure
+        self.nonblock = false unless old_value
+      end
     rescue Errno::EAGAIN
       if exception
         raise EAGAINWaitWritable
