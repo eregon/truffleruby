@@ -1,6 +1,5 @@
 exclude :test_cloexec, "needs investigation"
 exclude :test_socket_pair_with_block, "needs investigation"
-exclude :test_getcred_xucred, "needs investigation"
 exclude :test_unix_socket_pair_with_block, "needs investigation"
 exclude :test_abstract_namespace, "needs investigation"
 exclude :test_abstract_unix_server_socket, "needs investigation"
