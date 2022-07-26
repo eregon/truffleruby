@@ -246,6 +246,7 @@ module Truffle
 
       def self.pack_sockaddr_in(host, port, family = ::Socket::AF_UNSPEC,
                                 type = 0, flags = 0)
+        port ||= 0
         if type == 0
           begin
             # Check if the port is a numeric value we must set the socket type in order for the getaddrinfo call
