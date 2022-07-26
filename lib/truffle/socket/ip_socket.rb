@@ -40,7 +40,7 @@ class IPSocket < BasicSocket
   end
 
   private def internal_recvfrom(maxlen, flags, buffer, exception, nonblock = false)
-    message, addr = internal_recvmsg(maxlen, flags, nil, false, exception, nonblock)
+    message, addr = Truffle::Socket.recvfrom(self, maxlen, flags, exception, nonblock)
 
     return message if message == :wait_readable
 

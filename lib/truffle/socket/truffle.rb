@@ -389,5 +389,51 @@ module Truffle
         end
       end
     end
+
+    def self.recvfrom(socket, maxlen, flags, exception, nonblock)
+      socket_type = socket.getsockopt(:SOCKET, :TYPE).int
+
+      maxlen ||= 4096
+
+      Truffle::FFI::Pool.stack_use(maxlen, Primitive.pointer_find_type_size(:socklen_t)) do |msg_buffer, addr_len|
+        address = Truffle::Socket.sockaddr_class_for_socket(socket).new
+        begin
+          addr_len.write_int(address.size)
+
+          while ((msg_size = Truffle::Socket::Foreign.recvfrom(Primitive.io_fd(socket), msg_buffer, maxlen, flags, address.pointer, addr_len)) < 0)
+            if (nonblock == false) and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
+              socket.wait_readable
+            elsif !exception and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
+              return :wait_readable
+            else
+              Truffle::Socket::Error.read_error('recvmsg(2)', socket)
+            end
+          end
+
+          # When a socket is actually connected the address structure is not used.
+          if addr_len.read_int > 0
+            addr = Addrinfo.new(address.to_s, address.family, socket_type)
+          else
+            # The address info may not be filled in for stream type sockets, so we'll fill it in using getpeername.
+            if !nonblock && socket_type == ::Socket::SOCK_STREAM
+              Truffle::Socket::Foreign.memory_pointer(:int) do |size_p|
+                size_p.write_int(address.size)
+                if Truffle::Socket::Foreign._getpeername(Primitive.io_fd(socket), address, size_p) >= 0
+                  addr = Addrinfo.new(address.to_s, address.family, socket_type)
+                else
+                  Truffle::Socket::Error.read_error('recvmsg(2)', socket)
+                end
+              end
+            else
+              addr = Addrinfo.new([Socket::AF_UNSPEC], nil, socket_type)
+            end
+          end
+
+          return msg_buffer.read_string(msg_size), addr
+        ensure
+          address.pointer.free
+        end
+      end
+    end
   end
 end
