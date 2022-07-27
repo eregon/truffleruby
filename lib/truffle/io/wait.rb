@@ -27,13 +27,7 @@ class IO
     if @ibuffer
       return true if @ibuffer.size > 0
     end
-    ensure_open_and_readable
-    scheduler = Fiber.scheduler
-    if scheduler && !Fiber.blocking? && scheduler.respond_to?(:io_wait)
-      scheduler.io_wait(self, IO::READABLE, timeout)
-    else
-      Truffle::IOOperations.poll(self, Truffle::IOOperations::POLLIN, timeout) ? self : nil
-    end
+    Truffle::IOOperations.wait(self, IO::READABLE, timeout)
   end
 
   def wait(*args)
@@ -60,34 +54,14 @@ class IO
 
     events = IO::READABLE if events == 0
 
-    return wait_readable(timeout) if events == IO::READABLE
-
-    scheduler = Fiber.scheduler
-    if scheduler && !Fiber.blocking? && scheduler.respond_to?(:io_wait)
-      scheduler.io_wait(self, events, timeout)
-    else
-      reads = if events & IO::READABLE != 0
-                [self]
-              else
-                []
-              end
-      writes = if events & IO::WRITABLE != 0
-                 [self]
-               else
-                 []
-               end
-      Primitive.nil?(Kernel.select(reads, writes, [], timeout)) ? nil : self
+    if @ibuffer && events & IO::READABLE != 0
+      return true if @ibuffer.size > 0
     end
 
+    Truffle::IOOperations.wait(self, events, timeout)
   end
 
   def wait_writable(timeout = nil)
-    ensure_open_and_writable
-    scheduler = Fiber.scheduler
-    if scheduler && !Fiber.blocking? && scheduler.respond_to?(:io_wait)
-      scheduler.io_wait(self, IO::WRITABLE, timeout)
-    else
-      Truffle::IOOperations.poll(self, Truffle::IOOperations::POLLOUT, timeout) ? self : nil
-    end
+    Truffle::IOOperations.wait(self, IO::WRITABLE, timeout)
   end
 end

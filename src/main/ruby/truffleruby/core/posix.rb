@@ -357,12 +357,7 @@ module Truffle::POSIX
       string, errno = read_string(io, count)
       return string if errno == 0
       if errno == EAGAIN_ERRNO
-        scheduler = Fiber.scheduler
-        if scheduler && !Fiber.blocking? && scheduler.respond_to?(:io_wait)
-          scheduler.io_wait(io, IO::READABLE, nil)
-        else
-          IO.select([io])
-        end
+        Truffle::IOOperations.wait(io, IO::READABLE, nil)
       else
         Errno.handle_errno(errno)
       end
@@ -377,12 +372,7 @@ module Truffle::POSIX
       bytes_read, errno = read_to_buffer(io, count, &block)
       return bytes_read if errno == 0
       if errno == EAGAIN_ERRNO
-        scheduler = Fiber.scheduler
-        if scheduler && !Fiber.blocking? && scheduler.respond_to?(:io_wait)
-          scheduler.io_wait(io, IO::READABLE, nil)
-        else
-          IO.select([io])
-        end
+        Truffle::IOOperations.wait(io, IO::READABLE, nil)
       else
         Errno.handle_errno(errno)
       end
@@ -507,12 +497,7 @@ module Truffle::POSIX
           errno = Errno.errno
           if errno == EAGAIN_ERRNO
             if continue_on_eagain
-              scheduler = Fiber.scheduler
-              if scheduler && !Fiber.blocking? && scheduler.respond_to?(:io_wait)
-                scheduler.io_wait(io, IO::WRITABLE, nil)
-              else
-                IO.select([], [io])
-              end
+              Truffle::IOOperations.wait(io, IO::WRITABLE, nil)
             else
               return written
             end

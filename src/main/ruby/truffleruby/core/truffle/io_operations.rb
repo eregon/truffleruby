@@ -373,5 +373,14 @@ module Truffle
       event = IO::READABLE if event == 0
       event
     end
+
+    def self.wait(io, events, timeout)
+      scheduler = Fiber.scheduler
+      if scheduler && !Fiber.blocking? && scheduler.respond_to?(:io_wait)
+        scheduler.io_wait(io, events, timeout)
+      else
+        poll(io, events, timeout) ? io : nil
+      end
+    end
   end
 end

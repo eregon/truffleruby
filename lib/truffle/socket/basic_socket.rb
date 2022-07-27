@@ -162,7 +162,7 @@ class BasicSocket < IO
     begin
       while ((n_bytes = Truffle::Socket::Foreign.recv(Primitive.io_fd(self), buf, bytes_to_read, flags)) < 0)
         if (nonblock == false) and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
-          wait_readable
+          Truffle::IOOperations.wait(self, IO::READABLE, nil)
         elsif !exception and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
           return :wait_readable
         else
@@ -215,12 +215,7 @@ class BasicSocket < IO
 
         while ((msg_size = Truffle::Socket::Foreign.recvmsg(Primitive.io_fd(self), header.pointer, flags)) < 0)
           if (nonblock == false) and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
-            scheduler = Fiber.scheduler
-            if scheduler && !Fiber.blocking? && scheduler.respond_to?(:io_wait)
-              scheduler.io_wait(self, IO::READABLE, nil)
-            else
-              IO.select([self])
-            end
+            Truffle::IOOperations.wait(self, IO::READABLE, nil)
           elsif !exception and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
             return :wait_readable
           else
@@ -287,12 +282,7 @@ class BasicSocket < IO
 
       while ((num_bytes = Truffle::Socket::Foreign.sendmsg(Primitive.io_fd(self), header.pointer, flags)) < 0)
         if (nonblock == false) and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
-          scheduler = Fiber.scheduler
-          if scheduler && !Fiber.blocking? && scheduler.respond_to?(:io_wait)
-            scheduler.io_wait(self, IO::READABLE, nil)
-          else
-            IO.select([], [self])
-          end
+          Truffle::IOOperations.wait(self, IO::WRITABLE, nil)
         elsif !exception and Errno.errno == Truffle::POSIX::EAGAIN_ERRNO
           return :wait_writable
         else
