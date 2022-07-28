@@ -2276,7 +2276,9 @@ class IO
     flush
     raise IOError unless @ibuffer.empty?
 
-    str, errno = Truffle::POSIX.read_string(self, number_of_bytes)
+    while (str, errno = Truffle::POSIX.read_string(self, number_of_bytes)) && errno == Errno::EAGAIN::Errno
+      Truffle::IOOperations.wait(self, READABLE, nil)
+    end
     Errno.handle_errno(errno) unless errno == 0
 
     raise EOFError if Primitive.nil? str
