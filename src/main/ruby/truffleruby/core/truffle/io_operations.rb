@@ -233,6 +233,10 @@ module Truffle
               else
                 :retry
               end
+            elsif errno == Errno::EPIPE && Primitive.io_fd(io) == 1
+              # stdout must raise a SIGPIPE SignalException instead of Errno::EPIPE
+              # https://bugs.ruby-lang.org/issues/14413
+              raise SignalException, :SIGPIPE
             else
               Errno.handle_errno(errno)
             end
