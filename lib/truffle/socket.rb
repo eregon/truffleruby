@@ -57,6 +57,7 @@ require 'socket/truffle/foreign'
 require 'socket/truffle/error'
 require 'socket/truffle/bsd' if Truffle::Socket.bsd_support?
 require 'socket/truffle/linux' if Truffle::Socket.linux_support?
+require 'socket/truffle/connect'
 
 require 'socket/socket'
 require 'socket/option'

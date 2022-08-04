@@ -338,13 +338,18 @@ class Socket < BasicSocket
       sockaddr = sockaddr.to_sockaddr
     end
 
-    while (Truffle::Socket::Foreign.connect(Primitive.io_fd(self), sockaddr)) < 0
+    if (Truffle::Socket::Foreign.connect(Primitive.io_fd(self), sockaddr)) < 0
       errno = Errno.errno
-      if errno == Errno::EINPROGRESS::Errno || errno == Errno::EAGAIN::Errno
-        self.wait_writable
+      if errno == Errno::EINPROGRESS::Errno ||
+         errno == Errno::EAGAIN::Errno ||
+         ((defined? Errno::ERESTART) && errno == Errno::ERESTART::Errno) ||
+         errno == Errno::EINTR::Errno
+
         # If the connection was successfully made during waiting for
         # IO we should return 0 to indicate that.
-        return 0 if getsockopt(Socket::SOL_SOCKET, Socket::SO_ERROR).unpack(0) == 0
+        if (Truffle::Socket::Connect.wait_connectable(self) < 0)
+          Truffle::Socket::Error.connect_error('connect(2)', self)
+        end
       else
         Truffle::Socket::Error.connect_error('connect(2)', self)
       end
