@@ -1819,7 +1819,9 @@ class IO
             self.nonblock = true unless old_value
             Truffle::POSIX.read_string_nonblock(self, size, exception)
           ensure
-            self.nonblock = false unless old_value
+            if Truffle::Platform.linux? && !old_value
+              self.nonblock = false
+            end
           end
 
     case str
