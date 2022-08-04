@@ -2406,7 +2406,9 @@ class IO
         self.nonblock = true unless old_value
         Truffle::POSIX.write_string_nonblock(self, data)
       ensure
-        self.nonblock = false unless old_value
+        if Truffle::Platform.linux? && !old_value
+          self.nonblock = false
+        end
       end
     rescue Errno::EAGAIN
       if exception
