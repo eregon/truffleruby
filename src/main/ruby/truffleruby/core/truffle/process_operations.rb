@@ -314,6 +314,12 @@ module Truffle
           @options[:fds_to_close] << from
         else
           map << from << to
+          if from >= 0 && from <= 2
+            flags = Truffle::POSIX.fcntl(to, File::F_GETFL, 0)
+            if (flags & ::IO::NONBLOCK) != 0
+              Truffle::POSIX.fcntl(to, File::F_SETFL, flags & ~(::IO::NONBLOCK))
+            end
+          end
         end
       end
 
