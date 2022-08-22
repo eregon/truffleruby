@@ -580,6 +580,12 @@ public class DarwinAArch64NativeConfiguration extends DefaultNativeConfiguration
         configuration.config("platform.socket.SO_SNDTIMEO", 4101);
         configuration.config("platform.socket.SO_TIMESTAMP", 1024);
         configuration.config("platform.socket.SO_TYPE", 4104);
+        configuration.config("platform.socket.LOCAL_PEERCRED", 1);
+        configuration.config("platform.socket.LOCAL_PEERPID", 2);
+        configuration.config("platform.socket.LOCAL_PEEREPID", 3);
+        configuration.config("platform.socket.LOCAL_PEERUUID", 4);
+        configuration.config("platform.socket.LOCAL_PEEREUUID", 5);
+        configuration.config("platform.socket.LOCAL_PEERTOKEN", 6);
         configuration.config("platform.socket.TCP_FASTOPEN", 261);
         configuration.config("platform.socket.TCP_KEEPCNT", 258);
         configuration.config("platform.socket.TCP_KEEPINTVL", 257);
