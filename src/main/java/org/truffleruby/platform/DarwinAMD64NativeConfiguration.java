@@ -584,7 +584,6 @@ public class DarwinAMD64NativeConfiguration extends DefaultNativeConfiguration {
         configuration.config("platform.socket.LOCAL_PEEREPID", 3);
         configuration.config("platform.socket.LOCAL_PEERUUID", 4);
         configuration.config("platform.socket.LOCAL_PEEREUUID", 5);
-        configuration.config("platform.socket.LOCAL_PEERTOKEN", 6);
         configuration.config("platform.socket.TCP_FASTOPEN", 261);
         configuration.config("platform.socket.TCP_KEEPCNT", 258);
         configuration.config("platform.socket.TCP_KEEPINTVL", 257);
