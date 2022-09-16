@@ -215,6 +215,7 @@ module Truffle
       end
 
       begin
+        io.__send__(:ensure_open)
         primitive_result = Truffle::POSIX.truffleposix_poll(Primitive.io_fd(io), event_mask, remaining_timeout)
         result =
           if primitive_result < 0
