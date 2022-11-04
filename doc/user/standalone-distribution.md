@@ -50,7 +50,7 @@ jobs:
         ruby: [ 2.6, truffleruby, truffleruby-head ]
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - uses: ruby/setup-ruby@v1
       with:
         ruby-version: ${{ matrix.ruby }}
