@@ -17,12 +17,6 @@ jobs:
     - name: Setup jt
       run: echo "$PWD/bin" >> $GITHUB_PATH
 
-    - name: Restore ~/.mx/cache
-      uses: actions/cache@v3
-      with:
-        path: ~/.mx/cache
-        key: mx-cache-lint-${{ runner.os }}-${{ hashFiles('common.json') }}
-
     - uses: ./.github/actions/setup-jvmci-graal
 
     - run: jt install eclipse
@@ -49,12 +43,6 @@ jobs:
         working-directory: build
     - name: Setup jt
       run: echo "$PWD/bin" >> $GITHUB_PATH
-
-    - name: Restore ~/.mx/cache
-      uses: actions/cache@v3
-      with:
-        path: ~/.mx/cache
-        key: mx-cache-build-${{ runner.os }}-${{ hashFiles('build/common.json') }}
 
     - uses: ./build/.github/actions/setup-jvmci-graal
 
@@ -90,12 +78,6 @@ jobs:
           working-directory: build
       - name: Setup jt
         run: echo "$PWD/bin" >> $GITHUB_PATH
-
-      - name: Restore ~/.mx/cache
-        uses: actions/cache@v3
-        with:
-          path: ~/.mx/cache
-          key: mx-cache-build-native-${{ runner.os }}-${{ hashFiles('build/common.json') }}
 
       - uses: ./build/.github/actions/setup-jvmci-graal
 
