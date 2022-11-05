@@ -201,7 +201,7 @@ module Utilities
     if which('mx')
       'mx'
     else
-      mx_repo = find_or_clone_repo('https://github.com/graalvm/mx.git')
+      mx_repo = find_or_clone_repo('https://github.com/graalvm/mx.git', '6.9.10')
       "#{mx_repo}/mx"
     end
   end
