@@ -59,6 +59,10 @@ jobs:
 
     - uses: ./build/.github/actions/setup-jvmci-graal
 
+    - uses: lhotari/action-upterm@v1
+      with:
+        limit-access-to-actor: true
+
     - name: Build TruffleRuby
       run: jt build
 
