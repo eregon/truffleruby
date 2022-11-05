@@ -42,6 +42,10 @@ jobs:
       with:
         path: build
 
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.8'
     - run: python --version
     - run: python3 --version
     - run: python3.8 --version
