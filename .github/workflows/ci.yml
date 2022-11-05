@@ -5,8 +5,12 @@ on: [push, pull_request]
 permissions:
   contents: read
 
+env:
+  MX_PYTHON: python3.8
+
 jobs:
   lint:
+    if: false
     name: lint
     runs-on: ubuntu-20.04
     steps:
@@ -37,6 +41,11 @@ jobs:
       uses: actions/checkout@v3
       with:
         path: build
+
+    - run: python --version
+    - run: python3 --version
+    - run: python3.8 --version
+
     - name: Setup system Ruby
       uses: ruby/setup-ruby@v1
       with:
@@ -60,6 +69,7 @@ jobs:
         path: ${{ github.workspace }}/truffleruby-jvm.tar
 
   build_native:
+    if: false
     name: build native
     runs-on: ubuntu-20.04
     defaults:
@@ -191,6 +201,7 @@ jobs:
       - run: jt test fast :truffle
 
   ruby_spec_cruby:
+    if: false
     name: ruby/spec on CRuby ${{ matrix.ruby }}
     strategy:
       fail-fast: false
