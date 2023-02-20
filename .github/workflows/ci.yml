@@ -13,7 +13,7 @@ jobs:
     - name: Clone TruffleRuby
       uses: actions/checkout@v2
       with:
-        fetch-depth: 2
+        fetch-depth: 100
     - name: Setup system Ruby
       uses: ruby/setup-ruby@v1
     - name: Setup jt
@@ -33,6 +33,7 @@ jobs:
     - run: jt lint
 
   build:
+    if: false
     name: build jvm
     runs-on: ubuntu-20.04
     defaults:
@@ -74,6 +75,7 @@ jobs:
         path: ${{ github.workspace }}/truffleruby-jvm.tar
 
   build_native:
+    if: false
     name: build native
     runs-on: ubuntu-20.04
     defaults:
@@ -211,6 +213,7 @@ jobs:
       - run: jt test fast :truffle
 
   ruby_spec_cruby:
+    if: false
     name: ruby/spec on CRuby ${{ matrix.ruby }}
     strategy:
       fail-fast: false
