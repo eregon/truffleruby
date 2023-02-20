@@ -13,7 +13,7 @@ jobs:
     - name: Clone TruffleRuby
       uses: actions/checkout@v2
       with:
-        fetch-depth: 100
+        fetch-depth: 0
     - name: Setup system Ruby
       uses: ruby/setup-ruby@v1
     - name: Setup jt
