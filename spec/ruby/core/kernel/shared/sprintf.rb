@@ -166,6 +166,15 @@ describe :kernel_sprintf, shared: true do
         @method.call("%f", 1.444444444).should == "1.444444"
       end
 
+      # https://github.com/oracle/truffleruby/issues/3360
+      it "rounds half away from zero" do
+        @method.call("%.5f", 0.000005).should == "0.00001"
+        @method.call("%.5f", 0.000015).should == "0.00002"
+        @method.call("%.5f", 0.000025).should == "0.00002"
+        @method.call("%.5f", 0.000035).should == "0.00004"
+        @method.call("%.5f", 0.000045).should == "0.00004"
+      end
+
       it "displays Float::INFINITY as Inf" do
         @method.call("%f", Float::INFINITY).should == "Inf"
         @method.call("%f", -Float::INFINITY).should == "-Inf"

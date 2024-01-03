@@ -935,8 +935,7 @@ public abstract class FloatNodes {
 
         private DecimalFormat getNoExpFormat(RubyThread thread) {
             if (thread.noExpFormat == null) {
-                final DecimalFormatSymbols noExpSymbols = new DecimalFormatSymbols(Locale.ENGLISH);
-                thread.noExpFormat = new DecimalFormat("0.0################", noExpSymbols);
+                thread.noExpFormat = StringUtils.newDecimalFormat("0.0################");
             }
             return thread.noExpFormat;
         }
@@ -945,7 +944,7 @@ public abstract class FloatNodes {
             if (thread.smallExpFormat == null) {
                 final DecimalFormatSymbols smallExpSymbols = new DecimalFormatSymbols(Locale.ENGLISH);
                 smallExpSymbols.setExponentSeparator("e");
-                thread.smallExpFormat = new DecimalFormat("0.0################E00", smallExpSymbols);
+                thread.smallExpFormat = StringUtils.newDecimalFormat("0.0################E00", smallExpSymbols);
             }
             return thread.smallExpFormat;
         }
@@ -954,7 +953,7 @@ public abstract class FloatNodes {
             if (thread.largeExpFormat == null) {
                 final DecimalFormatSymbols largeExpSymbols = new DecimalFormatSymbols(Locale.ENGLISH);
                 largeExpSymbols.setExponentSeparator("e+");
-                thread.largeExpFormat = new DecimalFormat("0.0################E00", largeExpSymbols);
+                thread.largeExpFormat = StringUtils.newDecimalFormat("0.0################E00", largeExpSymbols);
             }
             return thread.largeExpFormat;
         }

@@ -18,7 +18,6 @@ package org.truffleruby.core.format.format;
 
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
-import java.util.Locale;
 
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.dsl.ImportStatic;
@@ -26,6 +25,7 @@ import com.oracle.truffle.api.dsl.Specialization;
 
 import org.truffleruby.core.format.printf.PrintfSimpleTreeBuilder;
 import org.truffleruby.core.string.StringOperations;
+import org.truffleruby.core.string.StringUtils;
 
 @ImportStatic(Double.class)
 public abstract class FormatEFloatNode extends FormatFloatGenericNode {
@@ -58,8 +58,7 @@ public abstract class FormatEFloatNode extends FormatFloatGenericNode {
         final byte[] digits;
         DecimalFormat format = getLanguage().getCurrentThread().formatEFloat;
         if (format == null) {
-            final DecimalFormatSymbols formatSymbols = new DecimalFormatSymbols(Locale.ENGLISH);
-            format = new DecimalFormat("0.0E00", formatSymbols);
+            format = StringUtils.newDecimalFormat("0.0E00");
             getLanguage().getCurrentThread().formatEFloat = format;
         }
 

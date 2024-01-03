@@ -9,6 +9,9 @@
  */
 package org.truffleruby.core.string;
 
+import java.math.RoundingMode;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.Locale;
 
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
@@ -72,6 +75,17 @@ public abstract class StringUtils {
         }
         builder.append(suffix);
         return builder.toString();
+    }
+
+    public static DecimalFormat newDecimalFormat(String pattern) {
+        var formatSymbols = new DecimalFormatSymbols(Locale.ENGLISH);
+        return newDecimalFormat(pattern, formatSymbols);
+    }
+
+    public static DecimalFormat newDecimalFormat(String pattern, DecimalFormatSymbols formatSymbols) {
+        var format = new DecimalFormat(pattern, formatSymbols);
+        format.setRoundingMode(RoundingMode.HALF_UP);
+        return format;
     }
 
 }

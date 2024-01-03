@@ -19,7 +19,6 @@ package org.truffleruby.core.format.format;
 import java.math.BigInteger;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
-import java.util.Locale;
 
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.dsl.ImportStatic;
@@ -27,6 +26,7 @@ import com.oracle.truffle.api.dsl.Specialization;
 
 import org.truffleruby.core.format.printf.PrintfSimpleTreeBuilder;
 import org.truffleruby.core.string.StringOperations;
+import org.truffleruby.core.string.StringUtils;
 import org.truffleruby.core.thread.RubyThread;
 
 @ImportStatic(Double.class)
@@ -85,12 +85,10 @@ public abstract class FormatGFloatNode extends FormatFloatGenericNode {
 
         if (format == null) {
             if (simple) {
-                final DecimalFormatSymbols formatSymbols = new DecimalFormatSymbols(Locale.ENGLISH);
-                format = new DecimalFormat("0.0", formatSymbols);
+                format = StringUtils.newDecimalFormat("0.0");
                 currentThread.formatGFloatSimple = format;
             } else {
-                final DecimalFormatSymbols formatSymbols = new DecimalFormatSymbols(Locale.ENGLISH);
-                format = new DecimalFormat("0.0E00", formatSymbols);
+                format = StringUtils.newDecimalFormat("0.0E00");
                 currentThread.formatGFloatExponential = format;
             }
 
