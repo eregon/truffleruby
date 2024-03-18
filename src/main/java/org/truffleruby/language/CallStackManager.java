@@ -81,10 +81,10 @@ public final class CallStackManager {
         return iterateFrames(1, frameInstance -> {
             final InternalMethod method = tryGetMethod(frameInstance.getFrame(FrameAccess.READ_ONLY));
             if (method != null && !ArrayUtils.contains(modules, method.getDeclaringModule())) {
-                if (skippedFirstFrameFound.get()) {
-                    return true;
+                if (!skippedFirstFrameFound.get()) {
+                    skippedFirstFrameFound.set(true);
+                    return false;
                 }
-                skippedFirstFrameFound.set(true);
             }
             return false;
         }, action);
