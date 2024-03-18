@@ -49,7 +49,7 @@ public abstract class TruffleThreadNodes {
             if (frame == null) {
                 return nil;
             } else {
-                Object variables = storageNode.execute(frame.materialize(), node);
+                Object variables = storageNode.execute(frame, node);
                 getLanguage(node).getCurrentFiber().extensionCallStack.setSpecialVariables(variables);
                 return variables;
             }
