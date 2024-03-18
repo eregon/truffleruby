@@ -15,9 +15,7 @@ import java.util.function.Predicate;
 import org.truffleruby.RubyContext;
 import org.truffleruby.RubyLanguage;
 import org.truffleruby.annotations.SuppressFBWarnings;
-import org.truffleruby.collections.Memo;
 import org.truffleruby.core.CoreLibrary;
-import org.truffleruby.core.array.ArrayUtils;
 import org.truffleruby.language.arguments.RubyArguments;
 import org.truffleruby.language.backtrace.Backtrace;
 import org.truffleruby.language.backtrace.BacktraceFormatter;
@@ -72,22 +70,6 @@ public final class CallStackManager {
             final Frame frame = f.getFrame(FrameAccess.READ_ONLY);
             return isRubyFrame(frame) && !isJavaCore(tryGetMethod(frame));
         }, frameAccess);
-    }
-
-    @TruffleBoundary
-    public <R> R iterateFrameNotInModules(Object[] modules, Function<FrameInstance, R> action) {
-        final Memo<Boolean> skippedFirstFrameFound = new Memo<>(false);
-
-        return iterateFrames(1, frameInstance -> {
-            final InternalMethod method = tryGetMethod(frameInstance.getFrame(FrameAccess.READ_ONLY));
-            if (method != null && !ArrayUtils.contains(modules, method.getDeclaringModule())) {
-                if (!skippedFirstFrameFound.get()) {
-                    skippedFirstFrameFound.set(true);
-                    return false;
-                }
-            }
-            return false;
-        }, action);
     }
 
     // Node

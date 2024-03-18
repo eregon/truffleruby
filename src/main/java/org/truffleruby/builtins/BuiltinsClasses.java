@@ -130,8 +130,6 @@ import org.truffleruby.core.thread.ThreadBacktraceLocationNodesBuiltins;
 import org.truffleruby.core.thread.ThreadBacktraceLocationNodesFactory;
 import org.truffleruby.core.thread.ThreadNodesBuiltins;
 import org.truffleruby.core.thread.ThreadNodesFactory;
-import org.truffleruby.core.thread.TruffleThreadNodesBuiltins;
-import org.truffleruby.core.thread.TruffleThreadNodesFactory;
 import org.truffleruby.core.time.TimeNodesBuiltins;
 import org.truffleruby.core.time.TimeNodesFactory;
 import org.truffleruby.core.tracepoint.TracePointNodesBuiltins;
@@ -250,7 +248,6 @@ public abstract class BuiltinsClasses {
         TruffleRegexpNodesBuiltins.setup(coreManager);
         TruffleRubyNodesBuiltins.setup(coreManager);
         TruffleSystemNodesBuiltins.setup(coreManager);
-        TruffleThreadNodesBuiltins.setup(coreManager);
         TypeNodesBuiltins.setup(coreManager);
         UnboundMethodNodesBuiltins.setup(coreManager);
         VMPrimitiveNodesBuiltins.setup(coreManager);
@@ -332,7 +329,6 @@ public abstract class BuiltinsClasses {
         TruffleRegexpNodesBuiltins.setupPrimitives(primitiveManager);
         TruffleRubyNodesBuiltins.setupPrimitives(primitiveManager);
         TruffleSystemNodesBuiltins.setupPrimitives(primitiveManager);
-        TruffleThreadNodesBuiltins.setupPrimitives(primitiveManager);
         TypeNodesBuiltins.setupPrimitives(primitiveManager);
         UnboundMethodNodesBuiltins.setupPrimitives(primitiveManager);
         VMPrimitiveNodesBuiltins.setupPrimitives(primitiveManager);
@@ -415,7 +411,6 @@ public abstract class BuiltinsClasses {
                 TruffleRegexpNodesFactory.getFactories(),
                 TruffleRubyNodesFactory.getFactories(),
                 TruffleSystemNodesFactory.getFactories(),
-                TruffleThreadNodesFactory.getFactories(),
                 TypeNodesFactory.getFactories(),
                 UnboundMethodNodesFactory.getFactories(),
                 VMPrimitiveNodesFactory.getFactories(),
