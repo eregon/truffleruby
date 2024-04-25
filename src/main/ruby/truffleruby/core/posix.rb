@@ -113,7 +113,7 @@ module Truffle::POSIX
       argument_types.each_with_index do |arg_type, i|
         if arg_type == :string
           string_args << i
-          nfi_args_types << '[sint8]'
+          nfi_args_types << :pointer
         else
           nfi_args_types << to_nfi_type(arg_type)
         end
@@ -131,8 +131,7 @@ module Truffle::POSIX
       method_body = Truffle::Graal.copy_captured_locals -> *args do
         string_args.each do |i|
           str = args.fetch(i)
-          # TODO CS 14-Nov-17 this involves copying to a Java byte[], and then NFI will copy it again!
-          args[i] = Primitive.string_to_null_terminated_byte_array str
+          args[i] = Truffle::CExt.string_to_ffi_pointer_copy(str)
         end
 
         if blocking
